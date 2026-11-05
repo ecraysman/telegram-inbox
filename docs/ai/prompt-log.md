@@ -154,3 +154,84 @@ End with a report in exactly this format:
 **AI action:** Commits authorized (local only; push is a separate approval). Created `.env.example` (A0 seeds it, A4 owns it from here). Answered that building and most validation don't need ngrok or real tokens. Made "api must not depend on ngrok" an explicit seam rule (D-041). Started step #5: ADR-002, ADR-003, ADR-004, first commit.
 
 **Step #5 work (orchestrator):** Wrote ADR-002 (SignalR), ADR-003 (webhook + topology) and ADR-004 (async replies) in Spanish, derived from `architecture.md` and `decisions-log.md` with no new decisions. Trimmed ADR-003 and ADR-004 to fit the one-page limit. Cleared every *(pending)* marker. First commit.
+
+---
+
+## P-010 · Human → Claude Code · 2026-11-05 · Secrets in .env + webhook secret question
+
+> Telegram bot token is in the env, ngrok too. add random passwords for rabig and postgres.
+> How to generate the webhook secret? aka, how to inform it to telegram.
+
+**AI action:**
+- Inspected `.env` printing only key names and set/empty status.
+- Generated random Postgres and RabbitMQ passwords (48 hex) and `TELEGRAM_WEBHOOK_SECRET` (64 hex) with `openssl rand`, writing them in place without printing any value; set `chmod 600`.
+- Validated formats, and validated the bot token against Telegram `getMe` (bot found, no webhook set yet).
+- Detected that `.env.example` had been moved to `.env` and restored it from git.
+- The auto-mode safety check blocked an `rm` of a temporary backup containing secrets; the deletion was left to the human.
+- Explained that the secret needs no manual step: the api sends it in `setWebhook`.
+
+---
+
+## P-011 · Orchestrator → A1 Architect (CRITIQUE) · 2026-11-05 · Step #7
+
+```text
+You are part of a small agent team building a technical challenge for encodelabs:
+a web inbox where an operator receives and answers Telegram bot messages in real time.
+
+Before doing anything, read:
+  1. <repo>/requirements.md   (the challenge, in Spanish — source of truth)
+  2. <repo>/AGENTS.md         (repo rules and guardrails)
+  3. Everything in <repo>/docs/plan/ (architecture, contracts, plan, tasks, ui-style, decisions-log)
+  4. Everything in <repo>/docs/adr/ (ADR-001..004, in Spanish)
+  5. <repo>/docs/ai/agents.md and <repo>/.env.example
+Do NOT read <repo>/.env (it contains real secrets).
+
+Hard rules:
+- You write NO files. Return analysis only.
+- Report only issues you can point to in a specific document (file + section/line). No generic advice.
+
+Role: Software architect. MODE = CRITIQUE. Nothing is implemented yet; you are reviewing the plan
+before three agents implement it in parallel from these documents alone.
+
+Find and rank (blocker / major / minor), each with: location, problem, concrete failure scenario, and a
+concrete fix:
+1. Contradictions between requirements.md, ADRs, contracts.md, architecture.md, plan.md, tasks.md,
+   AGENTS.md and decisions-log.md (names, status codes, ports, payloads, ordering keys, states).
+2. Requirement coverage gaps: every item of requirements §3.1, §3.2, §4, §5, §6 must be covered by a task.
+3. Untracked/implicit decisions: things implementers will have to decide that no document fixes and
+   that would make backend/frontend/platform diverge (e.g. serialization details, enum casing, how the
+   api's own SignalR notifier and the inbox.events relay avoid double-pushing, what the worker does when
+   contact upsert races, SignalR hub path through nginx, migrations ownership, read endpoint semantics).
+4. Technical correctness risks: RabbitMQ.Client 7 async API and publisher confirms, quorum queue
+   x-delivery-limit semantics in RabbitMQ 4.x, exclusive queues + auto-recovery, EF Core + ON CONFLICT
+   inside a transaction, Npgsql UTC rules, SignalR behind nginx, ngrok container agent API reachability,
+   Telegram setWebhook/secret_token constraints, Telegram message_id/date semantics, startup ordering and
+   healthchecks, the outbox sweeper racing with the normal publish path, the 503-on-broker-failure path.
+5. Over-engineering vs. challenge size: anything that costs a lot and an evaluator would not reward
+   (requirements §7 weights), or that risks not finishing a working end-to-end flow.
+6. Agent-process risks: anything in the parallel plan that will cause two agents to collide or block.
+
+Then list the top 5 changes you would make before implementation starts.
+
+End with a report in exactly this format:
+## Report
+### Files changed  (none)
+### Decisions taken (each: decision — reason — alternative rejected)
+### Deviations from plan/contracts
+### Verification performed
+### Open issues / risks
+```
+
+**A1 CRITIQUE result:** 4 blockers, 9 majors, 18 minors.
+- **Orchestrator verification:** independently confirmed the high-impact claims (`RequireHost` matches the Host header; STJ `+00:00`; EF enum casing vs the CHECK constraints; PostgreSQL 25P02 after a caught 23505; confirms ack unroutable messages unless mandatory; SignalR default reconnect gives up).
+- **Correction to A1:** Telegram's 24 h retention applies "either way" (webhook and getUpdates), so the ADR-003 claim stays, now with its source cited.
+- **Changes applied:** contracts revision 2 (§7), agent prompts, AGENTS.md, tasks, plan gates, ADR-001..004 wording, `.gitignore` build outputs. Recorded as D-043..D-055.
+- **Flagged for the human:** the 429 cap changes D-035's worst case from ~7 s to ~30 s.
+
+---
+
+## P-012 · Human → Claude Code · 2026-11-05 · Approve D-051 / step 7
+
+> this is a POC so 10s is reasonable.
+
+**AI action:** D-051 accepted. Every decision approved through step checkpoints marked ✅. Committed the step 7 revisions. Launched Step #8 Wave 1 (A2, A3, A4 in parallel).

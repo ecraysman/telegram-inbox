@@ -36,14 +36,14 @@
 
 | Agent | Tasks | Est. tool calls | Depends on |
 |---|---|---|---|
-| A2 Backend | B-1…B-10 | large | contracts only |
+| A2 Backend | B-1…B-10 in milestones M1→M4 (M4 cuttable, see tasks.md) | large (critical path) | contracts only |
 | A3 Frontend | F-1…F-6 | medium | contracts only |
-| A4 Platform | P-1…P-5 | small | contracts + the fixed paths in §3 below |
+| A4 Platform | P-1…P-5; acceptance is `docker compose config -q` (the real build happens at O-4) | small | contracts + the fixed paths in §3 below |
 
 **Gate G1 (A0, per agent report):**
 1. The report has all 5 sections.
 2. A0 **re-runs** the agent's verification commands itself and does not trust the report.
-3. `git diff --stat` shows no writes outside the agent's owned paths.
+3. `git status --porcelain --untracked-files=all` shows no writes outside the agent's owned paths. Untracked files count.
 4. A0 checks the contracts at the seams: DTO names, hub method names, queue names.
 
 **Integration (A0, O-4):** `docker compose up --build` with a test `.env`. If the human has filled in the real `.env`, A0 uses it without ever printing it; otherwise it uses dummy tokens, and webhook registration then retries harmlessly. A0 fixes any seam bug in the owning agent's area by sending the issue back to that agent (SendMessage), so ownership is preserved. One-line glue fixes are done by A0 and logged.
@@ -56,7 +56,7 @@
 **Gate G2:**
 - No open blocker or major findings.
 - Build and tests green.
-- `docker compose up` on a clean checkout ends with all containers healthy.
+- `docker compose up` on a clean checkout: postgres, rabbitmq, api and frontend **healthy**; worker **running** (it has no healthcheck by design, D-038); ngrok running with the real `.env`.
 - Commit: `feat: inbox backend, frontend and platform`. Agents never commit; only A0 commits, after each gate.
 
 ### Step #9: Prove (parallel)

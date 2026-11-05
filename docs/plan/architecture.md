@@ -61,7 +61,7 @@ tests/Inbox.Domain.Tests ← Domain
 2. Only private-chat text `message` updates are accepted. Anything else returns 200 and is logged.
 3. The update is mapped to the internal contract `IncomingTextMessage v1` (anti-corruption layer).
 4. The message is published as persistent, with publisher confirms. The webhook returns **200 only after the confirm** and **503 if the broker fails**, so Telegram retries.
-5. The worker (prefetch 1, manual ack) runs one transaction: upsert the contact, then `INSERT … ON CONFLICT (telegram_update_id) DO NOTHING`, then commit. It then publishes `messageReceived` to `inbox.events` and **acks after commit**. It re-notifies on duplicates as well.
+5. The worker (prefetch 1, manual ack) runs one transaction: load or create the contact through the domain, then `INSERT … ON CONFLICT (telegram_update_id) DO NOTHING` (exact recipe in contracts §7.4), then commit. It then publishes `messageReceived` to `inbox.events` and **acks after commit**. It re-notifies on duplicates as well.
 6. The api relay consumes `inbox.events` through an exclusive auto-delete queue and forwards to the SignalR hub.
 
 | Webhook case | Status |
@@ -121,7 +121,7 @@ worker: DeliverReply (prefetch 1, manual ack)
                    7d. poison payload (can't deserialize / message not found) → nack(requeue:false) → DLQ
 Operator ─POST /api/messages/{id}/retry─► RetryReply: Failed → Pending, re-publish, 202
 worker: RequeueStalePendingReplies (every 30 s)
-                   re-publishes Pending messages older than 60 s    ── closes the "committed but never published" gap
+                   re-publishes Pending messages with last_queued_at older than 60 s ── closes the "committed but never published" gap
 ```
 
 **Why the message row is the outbox.** If step 3 fails after step 2 commits (a broker outage or a crash), the message would stay Pending forever. There are three options:

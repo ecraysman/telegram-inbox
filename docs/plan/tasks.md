@@ -26,7 +26,9 @@ Every task's acceptance criteria include the Definition of Done in `AGENTS.md` �
 | B-7 | Telegram adapter: typed HttpClient (`sendMessage`, `setWebhook`, `getWebhookInfo`), error mapping (400/403 permanent; 429 with `retry_after`, 5xx and network transient) | The token never appears in logs (URL redaction) |
 | B-8 | Ngrok adapter: `/api/tunnels` discovery of the https tunnel | Retries until the tunnel exists |
 | B-9 | Api host: REST endpoints, ProblemDetails, SignalR hub + notifier, `inbox.events` relay, webhook endpoint on :8081 only, `WebhookRegistrationService` + watchdog, migrations at startup, health checks, fail-fast config | Matches contracts §1–§3 |
-| B-10 | Worker host: incoming consumer, outgoing consumer, outbox sweeper, RabbitMQ notifier | Matches architecture §3 and §6 |
+| B-10 | Worker host: incoming consumer, outgoing consumer, outbox sweeper, RabbitMQ notifier | Matches architecture §3 and §6 and contracts §7.4–§7.6 |
+
+**A2 milestones** (reported one by one; M4 can be cut): M1 inbound end to end · M2 REST read + mark-read · M3 outbound happy path · M4 Failed/retry, sweeper, watchdog.
 
 ## A3 · Frontend
 | ID | Task | Acceptance |
@@ -41,17 +43,17 @@ Every task's acceptance criteria include the Definition of Done in `AGENTS.md` �
 ## A4 · Platform
 | ID | Task | Acceptance |
 |---|---|---|
-| P-1 | `backend/Dockerfile` (multi-stage; builds both api and worker targets), with a healthcheck approach that works in aspnet images | `docker compose build` passes |
-| P-2 | `frontend/Dockerfile` + `nginx.conf` (SPA fallback, `/api` and `/hubs` proxy with WebSocket upgrade) | The UI loads at :4200 and the hub connects |
-| P-3 | `docker-compose.yml`: 6 services, healthchecks, `depends_on: service_healthy`, named volumes, ngrok → `api:8081` with an optional `NGROK_DOMAIN` | `docker compose config -q` passes |
-| P-4 | `.env.example` with every variable in contracts §6 and comments; `.gitignore` | No real values |
+| P-1 | `backend/Dockerfile` (multi-stage; targets `api` and `worker`; curl in the api stage) + `backend/.dockerignore` | Dockerfile reviewed against plan.md §3; real build at O-4 |
+| P-2 | `frontend/Dockerfile` + `frontend/nginx.conf` exactly per contracts §7.7 + `frontend/.dockerignore` | Matches §7.7; verified at O-4 (UI loads, hub on WebSocket) |
+| P-3 | `docker-compose.yml`: 6 services, healthchecks (§7.9), `depends_on: service_healthy` (api does **not** depend on ngrok), named volumes, localhost-only host ports, ngrok per §7.8 + `infra/ngrok/ngrok.yml` | `docker compose config -q` passes |
+| P-4 | Validate the existing `.env.example` against compose (every `${VAR}` documented) | No real values; no missing variables |
 | P-5 | Verify and pin the exact postgres and rabbitmq image tags | Tags exist on Docker Hub |
 
 ## A5 · QA (Step #9)
 | ID | Task | Acceptance |
 |---|---|---|
 | Q-1 | Run the build and unit tests; review domain test coverage and add any missing invariant tests | Report with real output |
-| Q-2 | Simulated Telegram scenarios: valid text, duplicate `update_id`, non-text, wrong secret, broker down → 503 | Evidence per scenario |
+| Q-2 | Simulated Telegram scenarios: valid text, duplicate `update_id`, non-text, wrong secret, broker down → 503. **Security boundary:** through the ngrok URL, `GET /api/contacts` and `/hubs/inbox` → 404 while `POST /telegram/webhook` works (needs the real `.env`) | Evidence per scenario |
 | Q-3 | Outbound scenarios: success, invalid token or blocked user → Failed + retry, outbox sweeper recovers Pending | Evidence |
 | Q-4 | `docs/qa/verification-report.md`: §3.1 and §3.2 marked PASS/FAIL/NOT-VERIFIED | Every row has evidence |
 | Q-5 | Manual end-to-end checklist for the human with a real Telegram account | Step by step |

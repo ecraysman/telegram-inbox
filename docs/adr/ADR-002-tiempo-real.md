@@ -37,6 +37,6 @@ SSE queda documentado como segunda opción.
 
 ## Consecuencias
 
-- **Ganamos:** reconexión y *fallback* sin código propio. El hub no conoce RabbitMQ, y el worker no conoce SignalR (Clean Architecture: puertos y adaptadores). `inbox.events` ya funciona como *backplane*: varias réplicas de la api reciben todos los eventos sin sumar Redis.
+- **Ganamos:** reconexión y *fallback* sin código propio. El hub no conoce RabbitMQ, y el worker no conoce SignalR (Clean Architecture: puertos y adaptadores). Los eventos del worker llegan a todas las réplicas de la api por `inbox.events`. Los que origina la propia api (encolado, lectura) se emiten localmente, así que escalar a varias réplicas requeriría enrutarlos también por `inbox.events` o sumar un *backplane*. Hoy se asume una sola réplica (ver Supuestos).
 - **Resignamos:** un protocolo estándar abierto (SignalR solo se consume bien con su cliente) y un salto extra (worker → RabbitMQ → api → navegador), de pocos milisegundos.
 - **Riesgos:** los eventos son **transitorios**: si la api está caída, se pierden. Es aceptable, porque la fuente de verdad es la base y el cliente resincroniza al reconectar. El proxy nginx debe configurarse para WebSocket (`Upgrade`/`Connection`, timeouts largos). Sin autenticación (fuera de alcance), cualquiera que alcance el hub ve los eventos. Por eso el hub **no** se expone por ngrok (ADR-003).

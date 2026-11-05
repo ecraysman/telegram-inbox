@@ -21,8 +21,8 @@ Respuesta **asíncrona por RabbitMQ**, con la **fila del mensaje como outbox**:
 1. **api:** valida el texto (no vacío y como máximo 4096 caracteres) y guarda el mensaje saliente en estado **`Pending`**. Publica `OutgoingTextMessage v1 {messageId}` con confirmación y responde **202**.
 2. **worker** (`inbox.outgoing.telegram`, `prefetch 1`): si el mensaje ya no está `Pending`, hace ack y termina (idempotente). Si sigue `Pending`, llama a `sendMessage`:
    - Éxito → **`Sent`**, guardando el `message_id` de Telegram.
-   - 400/403 → **`Failed`** con el motivo.
-   - 429/5xx/red → 3 reintentos respetando `retry_after`; si siguen fallando, **`Failed`**.
+   - 429 → hasta 3 reintentos esperando `retry_after` (con tope de 10 s). 5xx/red → 3 reintentos (1/2/4 s). Si siguen fallando, **`Failed`**.
+   - Cualquier otro 4xx (400, 401, 403, 404) → **`Failed`** sin reintento.
 3. Cada cambio de estado se persiste y se emite (`messageStatusChanged`). Un `Failed` se **acepta (ack) y se muestra**: no queda escondido en la DLQ, que se reserva para mensajes venenosos.
 4. **Barredor** del worker (cada 30 s): re-publica los `Pending` con más de 60 s. Esto cubre el caso de "guardado pero nunca publicado", por ejemplo si la api se cae entre el commit y la publicación. Si el broker no confirma, la api igual responde 202: el mensaje está seguro en la base y el barredor lo publicará.
 5. **Reintento manual:** `POST /api/messages/{id}/retry` pasa `Failed → Pending`. Es un botón "Reintentar" en la UI.
@@ -34,4 +34,4 @@ Las transiciones (`Pending → Sent | Failed`, `Failed → Pending`) son **regla
 - **Ganamos:** ninguna respuesta se pierde en silencio y las caídas de Telegram se absorben. El operador ve el estado de cada respuesta (reloj, ✓, ⚠ + "Reintentar"). La respuesta conserva su posición en la conversación (orden por momento de escritura + secuencia).
 - **Resignamos:** simplicidad: estados en el dominio y en la UI, un barredor y un endpoint extra.
 - **Riesgo aceptado: entrega *at-least-once*.** Si el worker se cae después de que Telegram aceptó el mensaje y antes de guardar `Sent` (milisegundos), la redelivery lo duplica. La alternativa *at-most-once* (estado `Sending`) convierte ese caso en una **pérdida silenciosa**, y en atención al cliente un duplicado raro es preferible.
-- **Riesgo aceptado: envío serial.** Un consumidor con `prefetch 1` mantiene el orden por conversación. Pero con Telegram caído, cada respuesta espera hasta unos 7 s de reintentos de la anterior. Es aceptable **hasta llegar a cientos de conversaciones activas *y* con Telegram degradado a la vez**. Entonces se particiona la cola por contacto (*consistent-hash exchange*) o se usan colas de reintento con demora.
+- **Riesgo aceptado: envío serial.** Un consumidor con `prefetch 1` mantiene el orden por conversación. Pero con Telegram caído, cada respuesta espera los reintentos de la anterior: unos 7 s ante errores 5xx o de red, y hasta unos 30 s si Telegram limita con 429. Es aceptable **hasta llegar a cientos de conversaciones activas *y* con Telegram degradado a la vez**. Entonces se particiona la cola por contacto (*consistent-hash exchange*) o se usan colas de reintento con demora.

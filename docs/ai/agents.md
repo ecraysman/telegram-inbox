@@ -17,9 +17,9 @@
 |---|---|---|---|---|---|
 | A0 | **Orchestrator** (main session) | Claude Code, Opus 5.5 | all | `docs/plan/**`, `docs/adr/**`, `docs/ai/**`, `AGENTS.md`, contracts, integration fixes | Skip a human checkpoint |
 | A1 | **Architect** | `Plan` (read-only), Opus | #2, #7 | none (returns text) | Write files |
-| A2 | **Backend engineer** | `general-purpose`, Opus | #8 | `backend/**` except `backend/Dockerfile` | Change contracts, touch the frontend or infrastructure |
-| A3 | **Frontend engineer** | `general-purpose`, Opus | #8 | `frontend/**` except `frontend/Dockerfile` | Change contracts, touch the backend |
-| A4 | **Platform engineer** | `general-purpose`, Opus | #8 | `docker-compose.yml`, `.env.example`, `.gitignore`, `infra/**`, `backend/Dockerfile`, `frontend/Dockerfile` | Write application code |
+| A2 | **Backend engineer** | `general-purpose`, Opus | #8 | `backend/**` except `backend/Dockerfile`, `backend/.dockerignore` | Change contracts, touch the frontend or infrastructure |
+| A3 | **Frontend engineer** | `general-purpose`, Opus | #8 | `frontend/**` except `frontend/Dockerfile`, `frontend/nginx.conf`, `frontend/.dockerignore` | Change contracts, touch the backend |
+| A4 | **Platform engineer** | `general-purpose`, Opus | #8 | `docker-compose.yml`, `.env.example`, `infra/**`, `backend/Dockerfile`, `backend/.dockerignore`, `frontend/Dockerfile`, `frontend/nginx.conf`, `frontend/.dockerignore` | Write application code |
 | A5 | **QA verifier** | `general-purpose`, Opus | #9 | `backend/tests/**` (gap-filling only), `docs/qa/**` | Fix production code (it reports failures instead) |
 | A6 | **Code reviewer** (adversarial) | `general-purpose` read-only by instruction, Opus | #8 end, #12 | none (returns findings) | Edit files |
 | A7 | **Technical writer** | `general-purpose`, Sonnet | #9, #11 | `README.md`, `docs/c4/**`, `docs/handout.md` | Change code or ADRs |
@@ -42,8 +42,13 @@ Before doing anything, read:
   1. <repo>/requirements.md   (the challenge, in Spanish — source of truth)
   2. <repo>/AGENTS.md         (repo rules and guardrails — mandatory)
   3. <repo>/docs/plan/plan.md (the approved plan; your section is named below)
-  4. <repo>/docs/plan/contracts.md (frozen interfaces — do not change)
-  5. <repo>/docs/adr/          (accepted decisions — do not contradict)
+  4. <repo>/docs/plan/contracts.md (frozen interfaces incl. §7 conventions — do not change)
+  5. <repo>/docs/plan/tasks.md     (your task IDs and acceptance criteria)
+  6. <repo>/docs/plan/architecture.md (flows in detail, e.g. §3 inbound, §6 outbound)
+  7. <repo>/docs/adr/          (accepted decisions — do not contradict)
+  8. <repo>/docs/plan/decisions-log.md (why things are the way they are)
+(requirements.md is local-only and git-ignored; it is present on this machine.)
+Never read <repo>/.env — it holds real secrets.
 
 Hard rules:
 - Only create/modify files inside the paths you own (listed below). If you need a change elsewhere,
@@ -101,8 +106,15 @@ Rank findings by severity (blocker / major / minor) with a concrete fix for each
 ```text
 [COMMON PREAMBLE]
 
-Role: Senior .NET engineer. Implement plan section "Backend".
-You own: backend/** (except backend/Dockerfile).
+Role: Senior .NET engineer. Implement tasks B-1..B-10 in docs/plan/tasks.md.
+You own: backend/** (except backend/Dockerfile and backend/.dockerignore).
+
+Deliver in milestones and report progress after each one (if you run out of budget, stop at a
+completed milestone and say so):
+  M1 inbound end-to-end: webhook → queue → worker → DB → inbox.events → hub
+  M2 REST read side + mark-as-read
+  M3 outbound happy path (QueueReply → worker → Telegram → Sent)
+  M4 Failed/retry endpoint, outbox sweeper, webhook watchdog   (cuttable if needed)
 
 Requirements:
 - Latest stable .NET (version fixed in AGENTS.md). Clean Architecture with projects
@@ -113,8 +125,11 @@ Requirements:
 - Use cases in Application, behind interfaces (ports) for: message repository, Telegram client,
   real-time notifier, message publisher. Adapters in Infrastructure.
 - Implement exactly the HTTP endpoints, real-time events and queue messages in docs/plan/contracts.md.
-- Webhook: validate X-Telegram-Bot-Api-Secret-Token, ignore non-text updates explicitly (log + 200),
-  publish to RabbitMQ, return 200 quickly. Consumer persists idempotently (unique update_id), then
+- Webhook: validate X-Telegram-Bot-Api-Secret-Token (constant time), ignore out-of-scope updates (log + 200),
+  publish with mandatory + publisher confirm, return 200 ONLY after the confirm and 503 on failure
+  (contracts §2 and §7.5). Port isolation by Connection.LocalPort (contracts §7.3), never RequireHost.
+- Follow the inbound persistence recipe in contracts §7.4 exactly; Telegram error classification §7.6;
+  a single shared JSON options factory §7.1; lowercase enum converters §7.2. Consumer persists idempotently (unique update_id), then
   notifies via the real-time channel. Manual ack after commit; poison messages go to the DLQ.
 - Webhook auto-registration at startup per the plan (ngrok API discovery + setWebhook, with retry).
 - EF Core + Npgsql, migrations included, all DateTime values in UTC (ADR-001).
@@ -128,8 +143,11 @@ Verify with: dotnet build, dotnet test. Use the dockerized SDK if the local SDK 
 ```text
 [COMMON PREAMBLE]
 
-Role: Senior Angular engineer. Implement plan section "Frontend".
-You own: frontend/** (except frontend/Dockerfile).
+Role: Senior Angular engineer. Implement tasks F-1..F-6 in docs/plan/tasks.md.
+Also read <repo>/docs/plan/ui-style.md (design tokens, layout, UI copy).
+You own: frontend/** (except frontend/Dockerfile, frontend/nginx.conf, frontend/.dockerignore).
+Project name `inbox`, build output frontend/dist/inbox/browser, relative URLs /api and /hubs/inbox (plan.md §3).
+Follow contracts §7.10 (connect before first fetch, never-ending reconnect, status precedence).
 
 Requirements:
 - Latest stable Angular (version fixed in AGENTS.md): standalone components, signals for state,
@@ -152,21 +170,26 @@ Verify with: ng build (production), ng lint if configured. Use the dockerized No
 ```text
 [COMMON PREAMBLE]
 
-Role: Platform/DevOps engineer. Implement plan section "Platform".
-You own: docker-compose.yml, .env.example, .gitignore, infra/**, backend/Dockerfile, frontend/Dockerfile.
+Role: Platform/DevOps engineer. Implement tasks P-1..P-5 in docs/plan/tasks.md.
+You own: docker-compose.yml, .env.example, infra/**, backend/Dockerfile, backend/.dockerignore,
+frontend/Dockerfile, frontend/nginx.conf, frontend/.dockerignore.
+The backend and frontend code is being written in parallel and may not exist yet: build against the fixed
+paths in plan.md §3. Your Wave-1 acceptance is `docker compose config -q` + Dockerfile review; the real
+`docker compose build` happens at integration (O-4).
+Follow contracts §7.7 (nginx), §7.8 (ngrok), §7.9 (health), and §1 (localhost-only host ports).
 
 Requirements:
 - `docker compose up` after filling `.env` must bring up the whole solution: postgres, rabbitmq
   (management UI), ngrok, api (+ worker if planned), frontend. Nothing else is required on the host.
 - Multi-stage Dockerfiles (SDK/Node build → slim runtime). Frontend served by nginx, which also
   reverse-proxies /api and the real-time endpoint to the api (single origin, no CORS needed).
-- Healthchecks + depends_on: condition: service_healthy, so the api starts after postgres/rabbitmq,
-  and webhook registration starts after ngrok has a tunnel.
+- Healthchecks + depends_on: condition: service_healthy, so the api starts after postgres/rabbitmq and the
+  worker after the api. The api must NOT depend on ngrok (D-041): registration retries in the background.
 - ngrok container tunnels to the api's webhook port; its local agent API (:4040) is reachable by the api
   for URL discovery.
 - .env.example: every variable from contracts.md, with comments, no real values. .gitignore must exclude .env.
 - No secrets in images or compose; all via env_file/.env.
-Verify with: docker compose config (validates), and docker compose build.
+Verify with: docker compose config -q. No RabbitMQ definitions file (contracts §7.5).
 ```
 
 ## A5 · QA verifier

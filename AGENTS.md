@@ -3,7 +3,7 @@
 Read this before touching anything. It applies to every human and AI agent working in this repository.
 
 ## 1. Sources of truth (highest first)
-1. `requirements.md`: the challenge. It is never edited.
+1. `requirements.md`: the challenge. It is never edited. **It is local-only and git-ignored (D-036)**; in the public repo, see the README for the summary of the challenge.
 2. `docs/adr/*`: accepted decisions.
 3. `docs/plan/contracts.md`: frozen interfaces (HTTP, SignalR, RabbitMQ, DB, env).
 4. `docs/plan/plan.md` and `docs/plan/tasks.md`: what to build and in which order.
@@ -18,7 +18,7 @@ backend/
   src/Inbox.Domain/  src/Inbox.Application/  src/Inbox.Infrastructure/  src/Inbox.Api/  src/Inbox.Worker/
   tests/Inbox.Domain.Tests/
 frontend/            Angular workspace + Dockerfile + nginx.conf
-infra/               ngrok config, rabbitmq definitions (if any)
+infra/               ngrok config (no RabbitMQ definitions file: the topology is declared in code)
 docs/adr/  docs/c4/  docs/plan/  docs/ai/  docs/qa/
 docker-compose.yml  .env.example  README.md  AGENTS.md
 ```
@@ -34,16 +34,18 @@ docker-compose.yml  .env.example  README.md  AGENTS.md
 | @microsoft/signalr | 10.0.x |
 | PostgreSQL / RabbitMQ images | `postgres:18-alpine` / `rabbitmq:4-management-alpine`. A4 pins the exact minor after verifying it exists |
 
-Local host SDKs are **not** assumed. Build and test with containers:
+Local host SDKs are **not** assumed. Build and test with containers, **always as your own user** (`--user`), so that `bin/`, `obj/`, `node_modules/` and `dist/` are not root-owned:
 ```bash
-docker run --rm -v "$PWD/backend":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
-docker run --rm -v "$PWD/frontend":/app -w /app node:24-alpine sh -c "npm ci && npx ng build"
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e DOTNET_CLI_HOME=/tmp -e NUGET_PACKAGES=/tmp/nuget \
+  -v "$PWD/backend":/src -w /src mcr.microsoft.com/dotnet/sdk:10.0 dotnet test
+docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -e npm_config_cache=/tmp/.npm \
+  -v "$PWD/frontend":/app -w /app node:24-alpine sh -c "npm ci && npx ng build"
 docker compose config -q && docker compose build
 ```
 
 ## 4. Allowed dependencies
 Any addition outside this list needs a "Decision" entry in your report with its justification.
-- **Backend:** `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.EntityFrameworkCore.Design` (migrations only), `RabbitMQ.Client`, `Microsoft.Extensions.Http.Resilience`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`, `xunit.v3` + `Microsoft.NET.Test.Sdk` + `xunit.runner.visualstudio`.
+- **Backend:** `Npgsql.EntityFrameworkCore.PostgreSQL`, `Microsoft.EntityFrameworkCore.Design` (migrations only), the `dotnet-ef` local tool, `RabbitMQ.Client`, `Microsoft.Extensions.Http.Resilience`, `Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore`, `xunit.v3` + `Microsoft.NET.Test.Sdk` + `xunit.runner.visualstudio`.
   - **Not allowed:** MediatR, MassTransit, FluentAssertions v8+, AutoMapper (all commercially licensed or unnecessary), Telegram.Bot (we use a small typed HttpClient adapter we control).
 - **Frontend:** `@microsoft/signalr`. No UI component framework and no state library; signals are enough.
 

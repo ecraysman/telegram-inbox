@@ -8,7 +8,7 @@ La bandeja necesita persistir **contactos** (usuarios de Telegram) y sus **mensa
 
 - Listado de contactos con **cantidad de no leídos** y **vista previa del último mensaje**.
 - Historial de una conversación ordenado por fecha.
-- Marcar como leídos todos los mensajes de un contacto.
+- Marcar como leídos los mensajes de un contacto hasta el último que el operador vio.
 
 Además, Telegram **reintenta** el webhook ante fallos, así que el alta de mensajes tiene que ser **idempotente** (clave única sobre `update_id`). Los mensajes contienen emojis, por lo que se requiere UTF-8 completo. El backend usa la última versión estable de .NET con EF Core. La solución tiene que levantar con `docker compose up`.
 
