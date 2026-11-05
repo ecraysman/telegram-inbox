@@ -1,0 +1,47 @@
+<header class="brand">
+  <h1 class="title"><span class="logo">encodelabs</span> · Bandeja</h1>
+  <app-connection-status [status]="status()" />
+</header>
+
+@if (error(); as message) {
+  <p class="notice error" role="alert">{{ message }}</p>
+}
+
+<ul class="contacts" aria-label="Conversaciones">
+  @for (contact of contacts(); track contact.id) {
+    <li>
+      <button
+        type="button"
+        class="contact"
+        [class.selected]="contact.id === selectedId()"
+        [attr.aria-current]="contact.id === selectedId() ? 'true' : null"
+        (click)="selectContact.emit(contact.id)"
+      >
+        <app-avatar [name]="contact.displayName" />
+        <span class="body">
+          <span class="row">
+            <span class="name">{{ contact.displayName }}</span>
+            <span class="time">{{ contact.lastMessage?.occurredAt | messageTime }}</span>
+          </span>
+          <span class="row">
+            <span class="preview">
+              @if (contact.lastMessage; as last) {
+                @if (last.direction === 'outbound') {
+                  <span class="you">Vos:</span>
+                }
+                {{ last.text }}
+              }
+            </span>
+            @if (contact.unreadCount > 0) {
+              <span class="badge" [attr.aria-label]="contact.unreadCount + ' sin leer'">{{ contact.unreadCount }}</span>
+            }
+          </span>
+        </span>
+      </button>
+    </li>
+  } @empty {
+    @if (loaded() && !error()) {
+      <li class="notice">No hay conversaciones todavía. Escribile al bot desde Telegram.</li>
+    }
+  }
+</ul>

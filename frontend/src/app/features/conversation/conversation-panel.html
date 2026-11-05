@@ -1,0 +1,34 @@
+@if (contact(); as current) {
+  <header class="header">
+    <app-avatar [name]="current.displayName" />
+    <div class="who">
+      <h2 class="name">{{ current.displayName }}</h2>
+      @if (current.username && current.displayName !== '@' + current.username) {
+        <span class="username">&#64;{{ current.username }}</span>
+      }
+    </div>
+  </header>
+
+  <section #history class="history" aria-label="Historial de la conversación" aria-live="polite">
+    @if (error(); as message) {
+      <p class="notice error" role="alert">{{ message }}</p>
+    }
+    @for (message of messages(); track message.id) {
+      <app-message-bubble [message]="message" [retrying]="retrying().has(message.id)" (retry)="retry.emit($event)" />
+    } @empty {
+      @if (loading()) {
+        <p class="notice">Cargando…</p>
+      }
+    }
+  </section>
+
+  <app-composer
+    [draft]="draft()"
+    [sending]="sending()"
+    [error]="sendError()"
+    (draftChange)="draftChange.emit($event)"
+    (send)="send.emit()"
+  />
+} @else {
+  <p class="placeholder">Seleccioná una conversación</p>
+}

@@ -1,0 +1,133 @@
+# Bandeja conversacional: whole solution.
+#   cp .env.example .env   # fill in the tokens
+#   docker compose up --build
+# UI: http://localhost:${FRONTEND_PORT:-4200}  ·  RabbitMQ UI: http://localhost:15672  ·  ngrok inspector: http://localhost:4040
+#
+# Every value comes from .env through ${VAR} interpolation; nothing secret is stored here or in the images.
+# Host ports are bound to 127.0.0.1 only (contracts §1). The api is reachable only through nginx (8080)
+# and through the ngrok tunnel (8081, webhook only).
+
+name: inbox
+
+x-db-connection: &db-connection "Host=postgres;Port=5432;Database=${POSTGRES_DB:?set POSTGRES_DB in .env};Username=${POSTGRES_USER:?set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
+
+services:
+  postgres:
+    image: postgres:18.6-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
+    volumes:
+      # postgres 18+ images keep PGDATA in a versioned subdirectory of /var/lib/postgresql.
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  rabbitmq:
+    image: rabbitmq:4.3-management-alpine
+    restart: unless-stopped
+    # Fixed hostname: RabbitMQ stores its data under the node name, so it must not change between runs.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?set RABBITMQ_USER in .env}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:15672:15672"   # management UI (demo); AMQP 5672 stays internal
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  ngrok:
+    image: ngrok/ngrok:3-alpine
+    restart: unless-stopped
+    environment:
+      # A missing or invalid token only breaks the tunnel; the inbox keeps working (D-041).
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+      NGROK_DOMAIN: ${NGROK_DOMAIN:-}
+    # --url is added only when NGROK_DOMAIN is non-empty (contracts §7.8). $$ escapes compose interpolation.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - exec ngrok http api:8081 --config /etc/ngrok/ngrok.yml $${NGROK_DOMAIN:+--url=$$NGROK_DOMAIN}
+    volumes:
+      - ./infra/ngrok/ngrok.yml:/etc/ngrok/ngrok.yml:ro
+    ports:
+      - "127.0.0.1:4040:4040"     # agent API + inspector; localhost only (shows the secret header)
+    # No depends_on: ngrok starts independently and forwards to api:8081 once the api is up.
+
+  api:
+    build:
+      context: ./backend
+      target: api
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_URLS: "http://+:8080;http://+:8081"   # 8080 REST/SignalR/health, 8081 webhook only
+      ConnectionStrings__Inbox: *db-connection
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__User: ${RABBITMQ_USER:?set RABBITMQ_USER in .env}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+      Telegram__WebhookSecret: ${TELEGRAM_WEBHOOK_SECRET:-}
+      Ngrok__ApiUrl: http://ngrok:4040
+    # The api does NOT depend on ngrok (D-041): webhook registration retries in the background.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      # Ready = DB + broker reachable; migrations run before app.Run(), so healthy implies migrated.
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    build:
+      context: ./backend
+      target: worker
+    restart: unless-stopped
+    environment:
+      ConnectionStrings__Inbox: *db-connection
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__User: ${RABBITMQ_USER:?set RABBITMQ_USER in .env}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD in .env}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN:-}
+    # Starts after the api is healthy, i.e. after the migrations were applied (ADR-001).
+    # No healthcheck by design (D-038): see the RabbitMQ consumer count and the logs.
+    depends_on:
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-4200}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres-data:
+  rabbitmq-data:

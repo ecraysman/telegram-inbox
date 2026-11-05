@@ -1,0 +1,61 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--color-neutral-20);
+  background: var(--color-white);
+}
+
+.who {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-brand-deepest);
+}
+
+.username {
+  font-size: 13px;
+  color: var(--color-neutral-60);
+}
+
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.notice {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-neutral-60);
+  text-align: center;
+}
+
+.notice.error {
+  color: var(--color-red-60);
+}
+
+.placeholder {
+  margin: auto;
+  font-size: 15px;
+  color: var(--color-neutral-60);
+}

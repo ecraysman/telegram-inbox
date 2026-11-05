@@ -41,7 +41,7 @@ a web inbox where an operator receives and answers Telegram bot messages in real
 Before doing anything, read:
   1. <repo>/requirements.md   (the challenge, in Spanish — source of truth)
   2. <repo>/AGENTS.md         (repo rules and guardrails — mandatory)
-  3. <repo>/docs/plan/plan.md (the approved plan; your section is named below)
+  3. <repo>/docs/plan/plan.md (the approved plan; §3 holds the fixed seam values)
   4. <repo>/docs/plan/contracts.md (frozen interfaces incl. §7 conventions — do not change)
   5. <repo>/docs/plan/tasks.md     (your task IDs and acceptance criteria)
   6. <repo>/docs/plan/architecture.md (flows in detail, e.g. §3 inbound, §6 outbound)
@@ -59,6 +59,10 @@ Hard rules:
   under "Decisions" in your report. Do not silently invent requirements.
 - Verify your own work before reporting (build, unit tests, lint). Report real output; if something
   fails or you could not run it, say so explicitly. Never claim something works without evidence.
+- Other agents work in the same directory at the same time. Never run git commands that change state
+  (add, commit, stash, checkout, reset, clean); the orchestrator commits. Read-only git is fine.
+- Run build tools only in containers as your own user (AGENTS.md §3, `--user "$(id -u):$(id -g)"`).
+- Never run `docker compose config` without `-q`: it prints the resolved secrets from .env.
 
 End with a report in exactly this format:
 ## Report
@@ -118,7 +122,7 @@ completed milestone and say so):
 
 Requirements:
 - Latest stable .NET (version fixed in AGENTS.md). Clean Architecture with projects
-  Domain / Application / Infrastructure / Api (+ Worker if the plan says so). The dependency rule is enforced:
+  Domain / Application / Infrastructure / Api / Worker (+ tests/Inbox.Domain.Tests). The dependency rule is enforced:
   Domain depends on nothing; Application depends on Domain only; Infrastructure and hosts depend inward.
 - The domain is rich, not anemic: invariants live in entities (e.g. a message is marked read by
   Contact/Conversation behaviour, not by setting properties from controllers).
@@ -135,7 +139,7 @@ Requirements:
 - EF Core + Npgsql, migrations included, all DateTime values in UTC (ADR-001).
 - Unit tests (xUnit) over the Domain layer only, as required by requirements.md §6.
 - Config only via environment variables named in contracts.md.
-Verify with: dotnet build, dotnet test. Use the dockerized SDK if the local SDK is older.
+Verify with: dotnet build (zero warnings) and dotnet test, using the dockerized .NET 10 SDK (host has .NET 8).
 ```
 
 ## A3 · Frontend engineer
@@ -162,7 +166,8 @@ Requirements:
 - Visual style similar to encodelabs.com.ar using the design tokens in docs/plan/ui-style.md
   (colors, typography). Desktop only, no animations required.
 - Out of scope: auth, media, responsive design, pagination.
-Verify with: ng build (production), ng lint if configured. Use the dockerized Node if the local one is too old.
+Verify with: production `ng build` and unit tests if any, using the dockerized node:24-alpine (host Node is 22.3,
+too old for Angular 22). Create the workspace with `npx @angular/cli@22 new inbox` inside the container.
 ```
 
 ## A4 · Platform engineer

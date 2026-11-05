@@ -1,0 +1,34 @@
+@let msg = message();
+<div class="bubble" [class.failed]="msg.status === 'failed'">
+  <p class="text">{{ msg.text }}</p>
+  <span class="meta">
+    <time [attr.datetime]="msg.occurredAt">{{ msg.occurredAt | messageTime: 'bubble' }}</time>
+    @switch (msg.status) {
+      @case ('pending') {
+        <svg class="icon" viewBox="0 0 16 16" role="img" aria-label="Enviando">
+          <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.5" />
+          <path d="M8 4.5V8l2.5 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      }
+      @case ('sent') {
+        <svg class="icon" viewBox="0 0 16 16" role="img" aria-label="Enviado">
+          <path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      }
+      @case ('failed') {
+        <svg class="icon" viewBox="0 0 16 16" role="img" aria-label="No enviado">
+          <path d="M8 1.75L15 14H1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+          <path d="M8 6v3.5M8 11.5v.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+      }
+    }
+  </span>
+</div>
+@if (msg.status === 'failed') {
+  <div class="failure" role="alert">
+    <span>No se pudo enviar{{ msg.failureReason ? ': ' + msg.failureReason : '.' }}</span>
+    <button type="button" class="retry" [disabled]="retrying()" (click)="retry.emit(msg.id)">
+      {{ retrying() ? 'Reintentando…' : 'Reintentar' }}
+    </button>
+  </div>
+}

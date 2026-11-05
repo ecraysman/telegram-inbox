@@ -1,0 +1,10 @@
+# ngrok agent configuration (contracts §7.8).
+# The authtoken comes from the NGROK_AUTHTOKEN environment variable, never from this file.
+# The tunnel itself (api:8081, optional --url) is set on the command line in docker-compose.yml.
+version: "3"
+agent:
+  # Explicit 0.0.0.0 so the api can reach the agent API at http://ngrok:4040/api/tunnels.
+  # The host port is bound to 127.0.0.1 only: the inspector shows the webhook secret header.
+  web_addr: 0.0.0.0:4040
+  log: stdout
+  log_format: logfmt

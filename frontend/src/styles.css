@@ -1,0 +1,51 @@
+/* Design tokens copied from encodelabs.com.ar (docs/plan/ui-style.md). */
+:root {
+  --color-brand-primary: oklch(0.499 0.082 209);
+  --color-brand-dark: oklch(0.382 0.066 215);
+  --color-brand-deepest: oklch(0.282 0.047 212);
+  --color-brand-light: oklch(0.951 0.012 201);
+  --color-brand-10: oklch(0.875 0.026 201);
+  --color-accent: oklch(0.627 0.132 162);
+  --color-blue-30: oklch(0.794 0.112 208);
+  --color-neutral-90: oklch(0.209 0 0);
+  --color-neutral-60: oklch(0.517 0 0);
+  --color-neutral-40: oklch(0.712 0 0);
+  --color-neutral-20: oklch(0.919 0 0);
+  --color-neutral-5: oklch(0.97 0 0);
+  --color-white: oklch(1 0 0);
+  --color-red-60: oklch(0.577 0.214 28);
+
+  --radius-xs: 0.5rem;
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-full: 9999px;
+
+  --shadow-soft: 0 1px 2px rgba(2, 6, 23, 0.08);
+
+  --font-family: 'Red Hat Display', system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--color-neutral-90);
+  background: var(--color-neutral-5);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-blue-30);
+  outline-offset: 2px;
+}

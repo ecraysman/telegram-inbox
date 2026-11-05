@@ -1,0 +1,3 @@
+# EF Core generated migrations: exclude from code-style and quality analyzers.
+[*.cs]
+generated_code = true

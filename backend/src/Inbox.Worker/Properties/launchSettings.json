@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Inbox.Worker": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

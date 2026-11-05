@@ -1,0 +1,18 @@
+<form class="composer" (submit)="$event.preventDefault(); submit()">
+  <textarea
+    class="input"
+    rows="2"
+    placeholder="Escribí una respuesta…"
+    aria-label="Respuesta"
+    [value]="draft()"
+    [attr.aria-invalid]="tooLong() ? 'true' : null"
+    (input)="onInput($event)"
+    (keydown)="onKeydown($event)"
+  ></textarea>
+  <button type="submit" class="send" [disabled]="!canSend()">{{ sending() ? 'Enviando…' : 'Enviar' }}</button>
+</form>
+@if (error(); as message) {
+  <p class="hint error" role="alert">{{ message }}</p>
+} @else if (showCounter()) {
+  <p class="hint" [class.error]="tooLong()">{{ length() }} / {{ maxLength }} caracteres</p>
+}
