@@ -1,0 +1,15 @@
+# Preguntas bonus
+
+## 1. ¿Para qué usarías un sistema de caché en una bandeja conversacional?
+
+Para que las lecturas frecuentes no crezcan con el historial, sin que la caché pase a ser la fuente de verdad. Hoy el listado de contactos calcula en cada consulta los no leídos y el último mensaje (D-022): es consistente y alcanza para un POC, pero su costo crece con la cantidad de mensajes. El primer candidato es el **resumen por contacto** (no leídos, última vista previa) en Redis, con patrón *cache-aside*. La invalidación vendría de los mismos eventos que ya emite el worker por `inbox.events` (`messageReceived`, `conversationRead`, `messageStatusChanged`), con un TTL corto como red de seguridad. Otros usos naturales:
+- la deduplicación de `update_id` en el borde, antes de publicar (hoy la garantiza el índice único de la base);
+- el control del límite de envío de Telegram (aproximadamente 1 mensaje por segundo por chat), compartido entre réplicas del worker;
+- datos de perfil y avatares;
+- el *backplane* de SignalR, cuando haya más de una réplica de la api.
+
+Lo que no cachearía es el estado de entrega de un mensaje: ese estado vive en la base y viaja por eventos. Disparador para introducirla: que `GET /api/contacts` deje de responder rápido con el volumen real.
+
+## 2. ¿Cómo gestionarías el tráfico de archivos multimedia?
+
+Nunca pasaría binarios por RabbitMQ ni los guardaría en la base: por las colas viajan solo referencias. **Entrada:** el webhook recibe un `file_id`, el worker guarda el mensaje con sus metadatos (tipo, tamaño, `file_unique_id`) en estado "descargando" y publica una tarea en una **cola separada**, con su propio consumidor, para que una descarga lenta no frene los textos. Ese consumidor obtiene el archivo con `getFile`, valida tipo y tamaño (la Bot API estándar descarga hasta 20 MB) y lo guarda en almacenamiento de objetos (S3 o MinIO), con el hash del contenido como clave para no duplicarlo. Después emite un evento y la UI lo muestra con una **URL firmada** de corta duración, con miniaturas generadas aparte y carga diferida. **Salida:** el operador sube el archivo al almacenamiento, la respuesta se encola como hoy (ADR-004) y el worker lo envía con `sendPhoto` o `sendDocument` (hasta 50 MB), guardando el `file_id` que devuelve Telegram para reutilizarlo sin volver a subirlo. Completaría el diseño con límites de tamaño, un análisis antivirus y una política de retención.

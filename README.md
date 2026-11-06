@@ -4,6 +4,8 @@ Prueba técnica encodelabs: una bandeja web donde un operador recibe, visualiza 
 
 **Resumen del desafío.** La bandeja debe: (1) recibir en tiempo real los mensajes de texto enviados al bot; (2) listar los contactos con su nombre o username, la cantidad de mensajes no leídos y la vista previa del último mensaje; (3) abrir una conversación y mostrar su historial; (4) marcar los mensajes como leídos al abrirla; y (5) permitir responder al contacto, de modo que la respuesta llegue al usuario en Telegram. Requisitos técnicos: backend .NET con Clean Architecture, frontend Angular, base de datos a elección, RabbitMQ para los mensajes entrantes, comunicación en tiempo real a elección, bot propio creado con BotFather, webhook registrado automáticamente con la URL pública de ngrok, y todo levantado con Docker Compose después de completar el `.env`. Quedan fuera de alcance: autenticación, mensajes que no sean de texto, diseño responsive y paginación del historial.
 
+**Para evaluar:** el [handout](docs/handout.md) es la guía de lectura (recorrido por criterio, decisiones y límites conocidos) y [docs/qa/traceability.md](docs/qa/traceability.md) mapea cada requisito a su código y evidencia.
+
 ## 1. Requisitos previos
 
 - Docker con Compose v2 (`docker compose`). No hace falta ningún SDK local: .NET y Node corren dentro de contenedores.
@@ -145,4 +147,8 @@ El primero corre los tests del dominio, el segundo los tests y el build del fron
 
 ## Trabajo con IA
 
-El documento de una página sobre las herramientas, los agentes y la validación del código estará en `docs/ai/trabajo-con-ia.md` (se escribe más adelante). Mientras tanto, el detalle está en [docs/ai/](docs/ai/): [agentes](docs/ai/agents.md) y [registro de prompts](docs/ai/prompt-log.md).
+Resumen de una página (herramientas, agentes y roles, prompts representativos y cómo se validó el código): [docs/ai/trabajo-con-ia.md](docs/ai/trabajo-con-ia.md). Detalle completo: [agentes](docs/ai/agents.md), [registro de prompts](docs/ai/prompt-log.md) y [prompts textuales](docs/ai/prompts/).
+
+## Preguntas bonus
+
+Caché y archivos multimedia: [docs/preguntas-bonus.md](docs/preguntas-bonus.md).

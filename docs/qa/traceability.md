@@ -49,8 +49,8 @@
 | README con las 5 secciones pedidas | `README.md` §1–§5 | ✅ |
 | C4 nivel 1 y 2 (draw.io + SVG) | `docs/c4/` | ✅ (contrastados con el compose y el código en el Step #9) |
 | ADR-001, ADR-002, ADR-003 con la plantilla y ≤ 1 página | `docs/adr/` | ✅ (más ADR-004 y ADR-005, opcionales) |
-| Trabajo con IA (1 página) | `docs/ai/trabajo-con-ia.md` | Step #11 |
-| Preguntas bonus | README | Step #11 |
+| Trabajo con IA (1 página) | `docs/ai/trabajo-con-ia.md` | ✅ (Step #11) |
+| Preguntas bonus | `docs/preguntas-bonus.md`, enlazado desde el README | ✅ (Step #11) |
 | Repositorio público | — | Step #12, con autorización del humano |
 
 ## 2. Plan vs. construido: cada decisión
@@ -109,7 +109,7 @@ Todas las decisiones de `docs/plan/decisions-log.md` se contrastaron con el cód
 | D-096 | ⚠️ P | Desvío 8 |
 | D-097, D-098 | ✅ | Aceptado; README y ADR-003 actualizados |
 
-**Tareas** (`docs/plan/tasks.md`): B-1..B-10, F-1..F-6, P-1..P-5, Q-1..Q-5, R-1, W-1, W-2, O-1..O-4 completas. Pendientes: O-5 (este documento), O-6, O-7, W-3 (Step #11) y R-2 (Step #12).
+**Tareas** (`docs/plan/tasks.md`): B-1..B-10, F-1..F-6, P-1..P-5, Q-1..Q-5, R-1, W-1, W-2, O-1..O-4 completas. O-5 (este documento), O-6, O-7 y W-3 se completaron en los Steps #10 y #11; queda R-2 (Step #12).
 
 ## 3. Desvíos respecto del plan
 
@@ -135,7 +135,7 @@ Todas las decisiones de `docs/plan/decisions-log.md` se contrastaron con el cód
 Chequeo automático sobre los 18 `.md` versionados: enlaces relativos, rutas citadas entre comillas invertidas e identificadores D-xxx, P-xxx y ADR-xxx.
 
 - **D-xxx, P-xxx, ADR-xxx:** todos existen. No quedan marcas *(pending: …)* en el registro de decisiones.
-- **Rutas faltantes:** solo `docs/qa/traceability.md` (este archivo), `docs/ai/trabajo-con-ia.md` y `docs/handout.md`, que se crean en los Steps #10 y #11.
+- **Rutas faltantes:** solo `docs/qa/traceability.md` (este archivo), `docs/ai/trabajo-con-ia.md` y `docs/handout.md`, que se crearon en los Steps #10 y #11. Re-chequeo al cerrar el Step #11: 22 archivos, 0 referencias colgantes.
 - **Correcciones:**
   - D-016 tenía el estado "🔁 reemplazada por D-021", pero su fila ya describe el orden vigente. Pasa a ✅ (revisada por D-021).
   - D-054 y README §5 decían que Angular 23 podía salir en días. Angular pasó a un ciclo anual y la versión 23 está prevista para junio de 2027; .NET 11 sigue en RC, con GA prevista para el 10/11.

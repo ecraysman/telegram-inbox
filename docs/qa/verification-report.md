@@ -141,3 +141,14 @@ NOT-VERIFIED por QA (no se usó un navegador). Por código: el store marca como 
 - **R-6:** las imágenes live `inbox-api`/`inbox-worker` se crearon a las 22:19:57, y `ConsumerErrorClassifier.cs` se modificó a las 22:23:23 (commit 22:23:31). QA verificó con imágenes reconstruidas desde `48698b6`. Antes de la prueba humana: `docker compose up -d --build` para asegurar que el live corre el commit.
 - **R-7:** "última versión estable": .NET 10 y Angular 22.2 lo son a la fecha, pero .NET 11 y Angular 23 suelen salir en noviembre. Si salen antes de la entrega, documentarlo como supuesto en el README.
 - NOT-VERIFIED que dependen del humano: `sendMessage` exitoso (✓), recepción real desde Telegram, bloqueo del bot → `Failed` → desbloqueo → Reintentar, UI (estilo, layout, no leídos, marcado al abrir), reconexión del navegador.
+
+## Anexo del orquestador (2026-11-06): estado posterior de los defectos
+
+Este informe refleja lo que QA encontró sobre `48698b6`. Los dos defectos se corrigieron en la ronda R-4 (`7202599`), con aprobación del humano:
+
+| Defecto | Corrección | Verificación |
+|---|---|---|
+| QA-D1 | D-093: tras 3 reintentos en proceso (1, 2 y 4 s), `nack` sin requeue → DLQ; `x-delivery-limit` queda solo como respaldo | A2, stack descartable: error no transitorio forzado con un CHECK → el mensaje llega a `inbox.incoming.telegram.dlq` a los ~7 s, una sola vez (con RabbitMQ 4.4.0; el arreglo no depende del contador de entregas). Re-revisión A6 R-4: corregido |
+| QA-D2 | D-094: "suscripción perdida" se decide por los `ShutdownEventArgs` del propio canal, y el `basic.cancel` del servidor tiene su propio camino (`WorkQueueConsumer`) | A2: reinicio del broker con un handler ocupado → sin "Lost the subscription" espurio, 1 consumidor por cola. Re-revisión A6 R-4: corregido |
+
+Stack live reconstruido con `7202599`: servicios sanos, 1 consumidor por cola, DLQs vacías y 0 errores en los logs. Detalle en `docs/qa/traceability.md`.

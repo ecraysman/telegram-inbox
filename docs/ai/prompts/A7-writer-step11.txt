@@ -1,0 +1,18 @@
+Role: A7 Technical writer, Step #11 (task W-3). Write in Spanish (rioplatense neutral, professional, concise).
+You own exactly one file: docs/handout.md (create it). Do not edit any other file; if something elsewhere looks wrong, list it in your report.
+
+Hard rules (AGENTS.md §7): never read, print or open .env (only .env.example); never run `docker compose config` without -q; never run git commands that change state (status/log/diff/show are fine); do not start, stop or rebuild containers.
+
+Read first: README.md, docs/qa/traceability.md, docs/qa/verification-report.md, docs/adr/*.md, docs/c4/README.md, docs/plan/decisions-log.md (skim), docs/ai/agents.md, docker-compose.yml. Requirements summary is in README; requirements.md is local only and you may read it for the evaluation rubric (§7).
+
+Goal: a handout for the encodelabs evaluator: the document they read first, before the code. At most 2 printed pages (~900 words). It must not repeat the README; it points into it. Content (the human delegated the choice, D-100):
+1. Qué es, en 3 líneas, y el flujo en una línea (Telegram → ngrok → api → RabbitMQ → worker → PostgreSQL → SignalR → UI; respuesta en cola).
+2. Cómo verlo funcionando en 5 minutos (link to README §2–§4, the 3–4 essential commands only, and docs/qa/manual-e2e-checklist.md).
+3. Recorrido sugerido por criterio de evaluación (§7: visión de negocio, arquitectura, toma de decisiones, trabajo con IA, calidad del código, funcionamiento e interfaz): for each, 2–3 bullets with exact repo paths to look at (real paths only; verify each exists with ls).
+4. Decisiones que van más allá de lo pedido, each with a one-line why and its D-xxx / ADR reference (queued replies with outbox row, separate worker, port isolation of the webhook, unlimited retry for transient infra errors, no resend after a Telegram outcome, ADR-004/005).
+5. Límites conocidos y riesgos aceptados (honest: serial outbound send D-035, at-least-once D-030, single operator D-027, live Telegram test pending at time of writing (G3 open), webhook re-registration not verified live, 429/5xx only verified by code reading).
+6. Mapa de la documentación (short table: path → what it is). The AI document is docs/ai/trabajo-con-ia.md (being written in parallel by the orchestrator; link it anyway).
+
+Style: headings + short bullets/tables, no marketing tone, no emojis, no claims without a path or evidence. Numbers must match the repo (69 domain tests, 33 frontend tests, 5 ADRs, 6 compose services) — verify them, don't copy them from this prompt blindly.
+
+Verify: every relative link and path you cite exists (ls). Report in the usual 5 sections: files changed, decisions, deviations, verification (commands + output), open issues.

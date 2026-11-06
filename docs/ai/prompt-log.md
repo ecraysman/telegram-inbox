@@ -920,3 +920,9 @@ Check: (a) IsChannelLevelClose: are the chosen reply codes and the Peer-initiato
 > When you're done with #10, if its not over 9.30 please go ahead and start #11 and the rest. We can fix later and get back to where we should.
 
 **AI action:** checked the time (07:47 -03), so steps #11 and #12 continue without a checkpoint (D-100). The handout content is chosen by the orchestrator and listed for the human to adjust later. Step #10 result: `docs/qa/traceability.md`; D-016 and D-054 corrected (D-099).
+
+## P-032 · Orchestrator → A7 (Agent, Sonnet) · Step #11 handout (W-3)
+
+Prompt verbatim in [`prompts/A7-writer-step11.txt`](prompts/A7-writer-step11.txt). The handout content was chosen by the orchestrator under D-100: an evaluator's guide (what it is, 5-minute run, a tour by §7 criterion with paths, decisions beyond scope, known limits, documentation map).
+
+**A7 W-3 result:** `docs/handout.md` (~1,090 words, 21 links all present). The orchestrator reviewed it and fixed four points: a stale "being written in parallel" note, "one major defect" → the two defects QA found, the webhook re-registration claimed as working → "designed to" (not verified live), and the missing bonus-answers row. Orchestrator (O-6, O-7): `docs/ai/trabajo-con-ia.md`, `docs/preguntas-bonus.md`, README links and a QA-report addendum (D-101). Reference check: 22 docs, 0 dangling.
