@@ -75,7 +75,7 @@ Decisiones de alcance tomadas ante lo que el enunciado no define (el identificad
 - La UI se sirve en `localhost:4200`, no a través de ngrok; ngrok expone únicamente el webhook (D-028, D-020).
 - Si se cambia el token del bot sobre una base existente, hay que recrear los datos con `docker compose down -v`, porque el `update_id` de Telegram es por bot (D-052).
 - Un mensaje demorado por reintentos de Telegram conserva su fecha original y se ordena en el pasado (D-053).
-- «Última versión estable» se interpreta como .NET 10 y Angular 22 al 2026-11-05; .NET 11 y Angular 23 podrían salir en los próximos días (D-054).
+- «Última versión estable» se interpreta como .NET 10 (LTS) y Angular 22. Al 2026-11-06, .NET 11 sigue en *release candidate* (su GA está prevista para el 10/11) y Angular 23 está previsto para junio de 2027 (D-054).
 - Un empate dentro del mismo segundo entre una respuesta (precisión de milisegundos) y un mensaje entrante (segundos enteros) puede mostrarse en cualquier orden; el desfase de reloj del host tiene el mismo efecto (D-080).
 - Ambas variables de Telegram deben tener valor; un token con formato válido pero falso permite usar la bandeja sin bot (D-081).
 - El tope de `retry_after` de Telegram es de 10 s y todo 4xx distinto de 429 se considera permanente (D-051).

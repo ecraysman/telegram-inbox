@@ -906,3 +906,17 @@ Check: (a) IsChannelLevelClose: are the chosen reply codes and the Peer-initiato
 ```
 
 **A6 R-4 result:** QA-D1, QA-D2 FIXED; no blockers or majors. m-4 accepted (D-097); m-5 and m-6 documented by the orchestrator (D-098); m-1 already fixed (D-091); MI-12 already accepted (D-085).
+
+---
+
+## P-030 · Human → Claude Code · 2026-11-06 · Step #10
+
+> Approved, start step 10
+
+**AI action:** the orchestrator (A0) runs the deviation audit itself, as `plan.md` assigns it: `docs/qa/traceability.md` (requirement → decision → code → evidence), every D-xxx marked as honoured or deviated, and a check for dangling references.
+
+## P-031 · Human → Claude Code · 2026-11-06 07:47 (mid-turn, during step #10)
+
+> When you're done with #10, if its not over 9.30 please go ahead and start #11 and the rest. We can fix later and get back to where we should.
+
+**AI action:** checked the time (07:47 -03), so steps #11 and #12 continue without a checkpoint (D-100). The handout content is chosen by the orchestrator and listed for the human to adjust later. Step #10 result: `docs/qa/traceability.md`; D-016 and D-054 corrected (D-099).
