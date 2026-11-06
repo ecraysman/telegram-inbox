@@ -679,3 +679,230 @@ The stack is rebuilt with this code. Report FIXED/NOT FIXED per item plus new fi
 **A6 final re-review R-3 result:** N-6, N-7 and N-9 FIXED; checks (a)–(e) pass; no blockers or majors. Minors: m-1 (ADR-004 wording, fixed), m-2 (accepted), m-3 (stale comment, a one-line glue fix by the orchestrator). The reviewer listed MI-12 as open, but it was already accepted as D-085.
 
 **Gate G2 ✔ (orchestrator):** no open blocker or major; builds and tests green; stack healthy (postgres, rabbitmq, api and frontend healthy; worker running); 1 consumer per queue; DLQs empty; 0 secrets in logs. Step #8 closed and committed.
+
+---
+
+## P-025 · Human → Claude Code · 2026-11-05 · Approve step 8
+
+> Approved. Continue
+
+**AI action:** Launched Step #9: A5 QA and A7 Writer in parallel. QA works on a throwaway stack for any scenario that needs signed webhooks (it must not read `.env`) and uses the live stack read-only.
+
+## P-026 · Orchestrator → A5 · Step #9 · A5-qa
+
+```text
+You are part of a small agent team building a technical challenge for encodelabs:
+a web inbox where an operator receives and answers Telegram bot messages in real time.
+
+Before doing anything, read:
+  1. <repo>/requirements.md   (the challenge, in Spanish — source of truth)
+  2. <repo>/AGENTS.md         (repo rules and guardrails — mandatory)
+  3. <repo>/docs/plan/plan.md (the approved plan; §3 holds the fixed seam values)
+  4. <repo>/docs/plan/contracts.md (frozen interfaces incl. §7 conventions — do not change)
+  5. <repo>/docs/plan/tasks.md     (your task IDs and acceptance criteria)
+  6. <repo>/docs/plan/architecture.md (flows in detail, e.g. §3 inbound, §6 outbound)
+  7. <repo>/docs/adr/          (accepted decisions — do not contradict)
+  8. <repo>/docs/plan/decisions-log.md (why things are the way they are)
+(requirements.md is local-only and git-ignored; it is present on this machine.)
+Never read <repo>/.env — it holds real secrets.
+
+Hard rules:
+- Only create/modify files inside the paths you own (listed below). If you need a change elsewhere,
+  stop and describe it in your report instead.
+- Never create, read or print a real `.env`, token or secret. Use `.env.example` names only.
+- Do not add features listed as "Fuera de alcance" (auth, media, responsive, pagination).
+- If something is ambiguous, pick the simplest option consistent with the ADRs, and list it
+  under "Decisions" in your report. Do not silently invent requirements.
+- Verify your own work before reporting (build, unit tests, lint). Report real output; if something
+  fails or you could not run it, say so explicitly. Never claim something works without evidence.
+- Other agents work in the same directory at the same time. Never run git commands that change state
+  (add, commit, stash, checkout, reset, clean); the orchestrator commits. Read-only git is fine.
+- Run build tools only in containers as your own user (AGENTS.md §3, `--user "$(id -u):$(id -g)"`).
+- Never run `docker compose config` without `-q`: it prints the resolved secrets from .env.
+
+End with a report in exactly this format:
+## Report
+### Files changed
+### Decisions taken (each: decision — reason — alternative rejected)
+### Deviations from plan/contracts
+### Verification performed (commands + result)
+### Open issues / risks
+
+Role: Independent QA. You did not write this code; assume it is broken until proven otherwise.
+You own: backend/tests/** (add missing domain tests only), docs/qa/**.
+
+Tasks:
+1. Build everything and run all unit tests; record real output.
+2. `docker compose up` with a test .env provided by the orchestrator. Check that every service is healthy
+   and the webhook got registered (check via getWebhookInfo, never printing the token).
+3. Simulate Telegram: POST realistic update payloads to the webhook (text, duplicate update_id,
+   non-text message, wrong secret token). Verify DB state, queue behaviour and real-time push.
+4. Walk through each functional requirement 3.1.1–3.1.5 and each technical requirement in 3.2 and mark it
+   PASS/FAIL/NOT-VERIFIED with evidence, in docs/qa/verification-report.md.
+5. Write the manual end-to-end checklist the human runs with a real Telegram account.
+Do not fix production code. Report each defect with steps to reproduce, expected and actual behaviour.
+
+Context for this run (Step #9, tasks Q-1..Q-5 in docs/plan/tasks.md). Commit 48698b6; G2 passed.
+- The LIVE stack is running with the human's real .env. You must NOT read .env, so you cannot sign webhook calls
+  to the live stack. Use the live stack only for read-only checks: `docker compose ps`, logs, GETs on
+  http://localhost:4200, rabbitmqctl list_queues/list_consumers, and the security boundary through the public
+  ngrok URL (read the URL from `docker compose logs api | grep "webhook registered"`; GET /api/contacts and
+  /hubs/inbox/negotiate must be 404, POST /telegram/webhook without the secret must be 401). Do not stop,
+  restart or recreate live containers, and do not POST data to the live stack.
+- Simulated Telegram scenarios (Q-2, Q-3) and fault injection run on a THROWAWAY stack you own: a separate docker
+  network, your own test secret and dummy bot token in the right format (e.g. 123456:TEST...), different host
+  ports (127.0.0.1:58080/58081), images via mirror.gcr.io if Docker Hub rate-limits. Remove it afterwards.
+  The api and worker images are already built locally (inbox-api, inbox-worker), so you can run them with env vars
+  from contracts §6 (ConnectionStrings__Inbox, RabbitMq__*, Telegram__*, Ngrok__ApiUrl pointing at nothing).
+- Also confirm with fault injection the two RabbitMQ.Client behaviours the reviewer could not run (D-092):
+  (1) on a broker connection loss (docker restart rabbitmq) the in-flight handler is not cancelled and there is
+  exactly 1 consumer per queue afterwards; (2) a server basic.cancel (e.g. consumer_timeout 15000 via
+  RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbit consumer_timeout 15000" with postgres disconnected) leads to
+  resubscription and eventual processing.
+- A real Telegram reply (sendMessage success) can only be verified by the human: mark it NOT-VERIFIED (human)
+  and make sure the Q-5 checklist covers it.
+- Q-4 report: docs/qa/verification-report.md (Spanish or English is fine; it is supporting evidence). Rows:
+  every §3.1 item, every §3.2 row, §3.3 out-of-scope respected, the security boundary, idempotency, broker outage
+  (503), DB outage, poison → DLQ, outbound Failed + retry, sweeper. Each with PASS/FAIL/NOT-VERIFIED + evidence.
+- Q-5: docs/qa/manual-e2e-checklist.md in Spanish, step by step, for the human with a real Telegram account
+  (incl. how to trigger a Failed reply safely, e.g. blocking the bot in Telegram, then unblocking and pressing Reintentar).
+- Q-1: add domain unit tests ONLY for invariants not yet covered (read tests/Inbox.Domain.Tests first); keep the
+  naming convention; run the whole suite.
+```
+
+## P-026 · Orchestrator → A7 · Step #9 · A7-writer-step9
+
+```text
+You are part of a small agent team building a technical challenge for encodelabs:
+a web inbox where an operator receives and answers Telegram bot messages in real time.
+
+Before doing anything, read:
+  1. <repo>/requirements.md   (the challenge, in Spanish — source of truth)
+  2. <repo>/AGENTS.md         (repo rules and guardrails — mandatory)
+  3. <repo>/docs/plan/plan.md (the approved plan; §3 holds the fixed seam values)
+  4. <repo>/docs/plan/contracts.md (frozen interfaces incl. §7 conventions — do not change)
+  5. <repo>/docs/plan/tasks.md     (your task IDs and acceptance criteria)
+  6. <repo>/docs/plan/architecture.md (flows in detail, e.g. §3 inbound, §6 outbound)
+  7. <repo>/docs/adr/          (accepted decisions — do not contradict)
+  8. <repo>/docs/plan/decisions-log.md (why things are the way they are)
+(requirements.md is local-only and git-ignored; it is present on this machine.)
+Never read <repo>/.env — it holds real secrets.
+
+Hard rules:
+- Only create/modify files inside the paths you own (listed below). If you need a change elsewhere,
+  stop and describe it in your report instead.
+- Never create, read or print a real `.env`, token or secret. Use `.env.example` names only.
+- Do not add features listed as "Fuera de alcance" (auth, media, responsive, pagination).
+- If something is ambiguous, pick the simplest option consistent with the ADRs, and list it
+  under "Decisions" in your report. Do not silently invent requirements.
+- Verify your own work before reporting (build, unit tests, lint). Report real output; if something
+  fails or you could not run it, say so explicitly. Never claim something works without evidence.
+- Other agents work in the same directory at the same time. Never run git commands that change state
+  (add, commit, stash, checkout, reset, clean); the orchestrator commits. Read-only git is fine.
+- Run build tools only in containers as your own user (AGENTS.md §3, `--user "$(id -u):$(id -g)"`).
+- Never run `docker compose config` without `-q`: it prints the resolved secrets from .env.
+
+End with a report in exactly this format:
+## Report
+### Files changed
+### Decisions taken (each: decision — reason — alternative rejected)
+### Deviations from plan/contracts
+### Verification performed (commands + result)
+### Open issues / risks
+
+Role: Technical writer. Write in Spanish (rioplatense neutral, professional). You own:
+README.md, docs/c4/**, docs/handout.md.
+
+Tasks:
+- README.md with exactly the sections required by requirements.md §5.1 (prerequisites, how to fill .env
+  incl. BotFather and ngrok token steps, how to run, how to test end-to-end, Supuestos), plus links
+  to ADRs, C4 and the AI document.
+- C4 Level 1 (context) and Level 2 (containers) as draw.io XML (+ exported SVG if possible), derived
+  from the actual docker-compose.yml and code, not from the plan. List every container and relationship
+  with its protocol. High level, no components.
+- Supuestos: take them from docs/plan/decisions-log.md; do not invent new ones.
+Every command you document must be one you actually see in the repo. Flag anything you can't verify.
+
+Context for this run (Step #9, tasks W-1, W-2 in docs/plan/tasks.md). Commit 48698b6. You own README.md and docs/c4/**.
+- requirements.md is local-only and git-ignored (D-036): the README must not link to it. Instead, start with a
+  short Spanish summary of the challenge ("Prueba técnica encodelabs: bandeja conversacional").
+- README sections, in Spanish, in this order (§5.1 requires 1–5; add the rest after):
+  1. Requisitos previos (Docker + Compose v2, a Telegram account, an ngrok account; nothing else: everything
+     builds in containers).
+  2. Cómo completar el .env: `cp .env.example .env`; BotFather /newbot → TELEGRAM_BOT_TOKEN; ngrok dashboard →
+     NGROK_AUTHTOKEN and the free static domain → NGROK_DOMAIN (optional); `openssl rand -hex 32` →
+     TELEGRAM_WEBHOOK_SECRET (explain that the app registers it with Telegram itself, D-042); DB/broker
+     passwords (`openssl rand -hex 24`, no ';'). A format-valid dummy token runs the inbox without a bot (D-081).
+  3. Cómo levantar: `docker compose up -d --build`; URLs: UI http://localhost:4200, RabbitMQ UI
+     http://localhost:15672, ngrok inspector http://localhost:4040 (localhost only; it shows the secret header).
+  4. Cómo probar de punta a punta: a short version of docs/qa/manual-e2e-checklist.md (QA is writing that file
+     in parallel; link to it), plus a curl check that the public URL exposes only the webhook.
+  5. Supuestos: derive them ONLY from docs/plan/decisions-log.md (rows marked Supuesto, plus scope decisions
+     such as D-025, D-026, D-027, D-028, D-036, D-052, D-053, D-054, D-080, D-081). One line each, plain Spanish,
+     with the D-id in parentheses. Do not invent new ones.
+  Then: Arquitectura (a paragraph plus links to the C4 diagrams and ADR-001..005), Decisiones destacadas (5–7
+  bullets that go beyond the requirements, each with its ADR/D-id), Solución de problemas (Docker Hub rate limit
+  → docker login (D-061/D-075); ngrok ERR_NGROK_108 = one agent session on the free plan; the first-run EF
+  "fail" on __EFMigrationsHistory is harmless; changing bots → docker compose down -v (D-052); worker has no
+  healthcheck (D-038)), Estructura del repositorio, Tests (exact commands from AGENTS.md §3), and Trabajo con IA
+  (link to docs/ai/; the one-page document is written later, so link docs/ai/trabajo-con-ia.md and note it).
+- Bonus answers are NOT yours (the orchestrator writes them later).
+- C4 (W-2): docs/c4/c4-l1-contexto.drawio and docs/c4/c4-l2-contenedores.drawio (valid draw.io XML, openable in
+  app.diagrams.net), plus an SVG export of each if you can (a hand-written SVG is fine if no draw.io CLI is
+  available; do not pull new Docker images just for that). L1: operator, Telegram user, the inbox system,
+  Telegram Bot API, ngrok cloud. L2: frontend (nginx + Angular 22), api (ASP.NET Core 10), worker (.NET 10),
+  postgres 18, rabbitmq 4.3, ngrok agent, plus the external systems. Every arrow labelled with what and the
+  protocol/port (e.g. "HTTPS webhook :443 → ngrok → api :8081", "AMQP 5672", "SignalR WebSocket /hubs/inbox",
+  "REST /api", "SQL 5432", "HTTP :4040 tunnel discovery", "sendMessage / setWebhook HTTPS"). Derive everything
+  from docker-compose.yml and the code, NOT from the plan; if the code and the plan disagree, follow the code and
+  report it. Labels in Spanish. Add docs/c4/README.md explaining how to open them.
+- Never read .env. Every command you document must exist in the repo or be a standard tool command.
+```
+**ADR condensing (orchestrator, during Step #9):** rewrote ADR-003 and ADR-004 to fit one page. Step-by-step detail now lives in architecture.md and contracts §7, which the ADRs reference; every alternative, decision and accepted risk is kept.
+
+**A7 Step #9 result (G ✔ with one fix):** README (sections 1–5 in order, plus architecture, decisions, troubleshooting, structure, tests, AI), C4 L1/L2 as `.drawio` and `.svg` generated from one script. Orchestrator: all 4 files parse; rendered both SVGs with headless Chrome and inspected them; diagrams are coherent with compose and code. Fixed one overlap in L2 (the operator→frontend line crossed the boundary title, so the title moved to x=200). README: all local links resolve except `docs/qa/manual-e2e-checklist.md`, which QA is writing in parallel; no link to `requirements.md`.
+
+**A5 QA result:** 9 new domain tests (orchestrator re-run: 69/69); report and Spanish checklist in `docs/qa/`. Everything verifiable without a real Telegram account passes, and D-092 (1) and (2) are confirmed by fault injection. Defects found:
+- **QA-D1 (major):** on RabbitMQ 4.3.7, `basic.nack(requeue=true)` does not increment `x-delivery-count`, so "other unexpected" errors loop forever and never reach the DLQ. This contradicts contracts §7.5 and D-084.
+- **QA-D2 (minor):** a late connection-loss event was treated as a lost subscription.
+- Observation: frontend Vitest tests vs requirements §6 ("tests unitarios sobre el dominio").
+- QA's `docker volume prune` was denied by the permission classifier, and the orchestrator did not retry it (a denied action is not re-attempted on its behalf).
+
+---
+
+## P-027 · Human → Claude Code · 2026-11-05 · QA decisions
+
+> 1. Fix
+> 2. Keep and document
+> 3. Remember me tomorrow
+> Start. Well do 4 later
+
+**AI action:** D-093..D-095; contracts revision 5; R-4 dispatched to A2; README note on the frontend tests (orchestrator edit to an A7-owned file, logged); reminder about the dangling volumes saved to persistent memory. The live test (4) is deferred by the human.
+
+## P-028 · Orchestrator → A2 (SendMessage) · fix round R-4
+
+```text
+Fix round R-4 for backend (approved by the human as a 4th round): QA found two defects in QueueConsumer. Same rules as before (own paths, no git state changes, containers as your user, do not touch the running compose stack, throwaway stacks only on separate networks/ports, remove them afterwards, and do NOT run `docker volume prune`; remove only your own containers with `docker rm -f -v` and your own networks).
+
+Read contracts §7.5 (revision 5) and D-093, D-094 first.
+
+1. QA-D1 (major, D-093): on RabbitMQ 4.3.7 a consumer basic.nack(requeue=true) does NOT increment x-delivery-count (QA saw 29 requeues with x-delivery-count stuck at 1), so the "Other unexpected" class never reaches the DLQ and loops forever. Change: after the 3 in-process retries (1, 2, 4 s), nack WITHOUT requeue → DLQ. Keep x-delivery-limit only as a backstop. Poison and transient-infrastructure classes are unchanged, and so is the post-send save loop (D-087).
+   Evidence required: on a throwaway stack force an "unexpected" non-transient DB error (e.g. a temporary CHECK constraint that rejects the insert) and show the message lands in the DLQ after ~7 s, once.
+2. QA-D2 (minor, D-094): during a broker restart, a connection-loss close event for a channel was handled 26 s late (after recovery), when IConnection.IsOpen was already true again, so it was treated as a lost subscription and the consumer was recreated (which could cancel an in-flight send). Decide from the channel's own ShutdownEventArgs instead (e.g. a connection-level close / the reply code and initiator say the connection died → leave it to automatic recovery; a server channel close or basic.cancel on a live connection → lost subscription). Keep N-6/D-088 semantics.
+   Evidence: broker `docker restart` while a handler is busy on the other queue: no spurious "Lost the subscription", 1 consumer per queue afterwards.
+
+Verify: dotnet build (0 warnings), dotnet test (69 tests, all passing). Report in the usual 5-section format.
+```
+
+**A2 R-4 result (G1 ✔):** QA-D1 (unexpected → DLQ after 3 retries, about 7 s, seen once in the DLQ), QA-D2 (lost subscription decided from ShutdownEventArgs plus a new consumer subclass for basic.cancel), N-1 regression re-run. Tested on RabbitMQ 4.4.0 (the pinned version is 4.3); the fix does not depend on x-delivery-count. Orchestrator: build 0 warnings, 69/69 tests, ownership clean, read IsChannelLevelClose, rebuilt live stack healthy with 1 consumer per queue and 0 errors.
+
+## P-029 · Orchestrator → A6 (SendMessage) · narrow re-review R-4
+
+```text
+Narrow re-review R-4: verify QA-D1 and QA-D2 only. Same read-only rules as before.
+Files: backend/src/Inbox.Infrastructure/Messaging/QueueConsumer.cs, WorkQueueConsumer.cs (new), ConsumerErrorClassifier.cs (git diff vs HEAD for context). Decisions: D-093 (unexpected → 3 retries → nack without requeue → DLQ; x-delivery-limit only a backstop), D-094 (classify lost subscription from the event itself). Contracts §7.5 revision 5.
+QA evidence for context: on RabbitMQ 4.3.7 consumer nack(requeue=true) did not increment x-delivery-count; a late-processed connection-loss event was treated as a lost subscription.
+Check: (a) IsChannelLevelClose: are the chosen reply codes and the Peer-initiator rule right for a server channel close (e.g. consumer_timeout PRECONDITION_FAILED on 4.3) versus a connection loss (320, library/network close)? Any case that now leaves a dead consumer (the N-1 regression) or cancels an in-flight send on a connection blip (D-088)? (b) WorkQueueConsumer: is HandleBasicCancelAsync the only path for a server basic.cancel, and does anything that the old UnregisteredAsync handled now go unhandled? (c) the DLQ path for unexpected errors: correct settle on the right channel/generation, no double settle. Report only blockers or majors in detail; list minors briefly. Usual 5-section format.
+```
+
+**A6 R-4 result:** QA-D1, QA-D2 FIXED; no blockers or majors. m-4 accepted (D-097); m-5 and m-6 documented by the orchestrator (D-098); m-1 already fixed (D-091); MI-12 already accepted (D-085).

@@ -78,6 +78,31 @@ public sealed class ContactTests
     }
 
     [Fact]
+    public void UpdateProfile_OnlyWhitespaceOrAtSignDiffers_ReturnsFalse()
+    {
+        var contact = TestData.Contact();
+
+        var changed = contact.UpdateProfile(" Ana ", "Pérez  ", "@anap", TestData.Now.AddMinutes(5));
+
+        Assert.False(changed);
+        Assert.Equal("anap", contact.Username);
+        Assert.Equal(TestData.Now, contact.UpdatedAt);
+    }
+
+    [Fact]
+    public void UpdateProfile_BlankLastNameAndUsername_AreStoredAsNull()
+    {
+        var contact = TestData.Contact();
+
+        var changed = contact.UpdateProfile("Ana", "   ", "  ", TestData.Now.AddMinutes(5));
+
+        Assert.True(changed);
+        Assert.Null(contact.LastName);
+        Assert.Null(contact.Username);
+        Assert.Equal("Ana", contact.DisplayName);
+    }
+
+    [Fact]
     public void UpdateProfile_NonUtcTime_Throws() =>
         Assert.Throws<DomainException>(() => TestData.Contact().UpdateProfile("X", null, null, DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(2))));
 }

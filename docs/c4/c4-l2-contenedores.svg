@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" font-family="Helvetica, Arial, sans-serif">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#444"/></marker></defs>
+<rect width="1400" height="820" fill="#fff"/>
+<text x="20" y="22" font-size="16" font-weight="bold" fill="#222">C4 Nivel 2: Contenedores, Bandeja conversacional</text>
+<rect x="20" y="150" width="1000" height="650" rx="8" fill="none" stroke="#444" stroke-width="1.5" stroke-dasharray="8 4"/>
+<text x="200" y="168" font-size="12" font-weight="bold" fill="#444">Bandeja conversacional (Docker Compose, proyecto «inbox»)</text>
+<rect x="90" y="30" width="180" height="70" rx="8" fill="#08427B" stroke="#073B6F"/>
+<text x="180.0" y="55.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Operador</text>
+<text x="180.0" y="69.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[Persona]</text>
+<text x="180.0" y="83.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Usa la bandeja web</text>
+<rect x="90" y="230" width="180" height="90" rx="8" fill="#438DD5" stroke="#3C7FC0"/>
+<text x="180.0" y="258.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">frontend</text>
+<text x="180.0" y="272.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[nginx 1.30 + Angular 22]</text>
+<text x="180.0" y="286.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Sirve la SPA y hace</text>
+<text x="180.0" y="300.0" font-size="11" fill="#FFFFFF" text-anchor="middle">proxy a la api (:80)</text>
+<rect x="450" y="230" width="180" height="90" rx="8" fill="#438DD5" stroke="#3C7FC0"/>
+<text x="540.0" y="258.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">api</text>
+<text x="540.0" y="272.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[ASP.NET Core 10]</text>
+<text x="540.0" y="286.0" font-size="11" fill="#FFFFFF" text-anchor="middle">REST, SignalR, webhook</text>
+<text x="540.0" y="300.0" font-size="11" fill="#FFFFFF" text-anchor="middle">(:8080 UI, :8081 webhook)</text>
+<rect x="800" y="230" width="170" height="90" rx="8" fill="#438DD5" stroke="#3C7FC0"/>
+<text x="885.0" y="258.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">ngrok agent</text>
+<text x="885.0" y="272.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[ngrok 3]</text>
+<text x="885.0" y="286.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Túnel a api:8081</text>
+<text x="885.0" y="300.0" font-size="11" fill="#FFFFFF" text-anchor="middle">(API del agente :4040)</text>
+<rect x="450" y="450" width="180" height="90" rx="8" fill="#438DD5" stroke="#3C7FC0"/>
+<text x="540.0" y="478.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">rabbitmq</text>
+<text x="540.0" y="492.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[RabbitMQ 4.3]</text>
+<text x="540.0" y="506.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Colas quorum, exchanges</text>
+<text x="540.0" y="520.0" font-size="11" fill="#FFFFFF" text-anchor="middle">inbox.* (AMQP :5672)</text>
+<rect x="450" y="670" width="180" height="90" rx="8" fill="#438DD5" stroke="#3C7FC0"/>
+<text x="540.0" y="698.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">worker</text>
+<text x="540.0" y="712.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[.NET 10]</text>
+<text x="540.0" y="726.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Procesa entrantes, envía</text>
+<text x="540.0" y="740.0" font-size="11" fill="#FFFFFF" text-anchor="middle">respuestas, sweeper</text>
+<path d="M800,550 a85.0,10 0 0 1 170,0 v80 a85.0,10 0 0 1 -170,0 z" fill="#438DD5" stroke="#3C7FC0"/>
+<path d="M800,550 a85.0,10 0 0 0 170,0" fill="none" stroke="#3C7FC0"/>
+<text x="885.0" y="579.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">postgres</text>
+<text x="885.0" y="593.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[PostgreSQL 18]</text>
+<text x="885.0" y="607.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Contactos y mensajes</text>
+<text x="885.0" y="621.0" font-size="11" fill="#FFFFFF" text-anchor="middle">(:5432)</text>
+<rect x="1180" y="230" width="180" height="80" rx="8" fill="#999999" stroke="#6B6B6B"/>
+<text x="1270.0" y="260.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">ngrok cloud</text>
+<text x="1270.0" y="274.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[Sistema externo]</text>
+<text x="1270.0" y="288.0" font-size="11" fill="#FFFFFF" text-anchor="middle">URL pública HTTPS</text>
+<rect x="1180" y="420" width="180" height="80" rx="8" fill="#999999" stroke="#6B6B6B"/>
+<text x="1270.0" y="450.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Telegram Bot API</text>
+<text x="1270.0" y="464.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[Sistema externo]</text>
+<text x="1270.0" y="478.0" font-size="11" fill="#FFFFFF" text-anchor="middle">api.telegram.org</text>
+<rect x="1180" y="620" width="180" height="70" rx="8" fill="#08427B" stroke="#073B6F"/>
+<text x="1270.0" y="645.0" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Usuario de Telegram</text>
+<text x="1270.0" y="659.0" font-size="11" fill="#FFFFFF" text-anchor="middle">[Persona]</text>
+<text x="1270.0" y="673.0" font-size="11" fill="#FFFFFF" text-anchor="middle">Escribe al bot</text>
+<polyline points="180,100 180,230" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="146.3" y="111.0" width="67.4" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="180" y="122.0" font-size="10" fill="#222" text-anchor="middle">HTTP :4200</text>
+<text x="180" y="134.0" font-size="10" fill="#222" text-anchor="middle">(localhost)</text>
+<polyline points="90,65 45,65 45,495 450,495" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="120.39999999999999" y="481.0" width="159.20000000000002" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="200" y="492.0" font-size="10" fill="#222" text-anchor="middle">HTTP :15672 (UI de RabbitMQ,</text>
+<text x="200" y="504.0" font-size="10" fill="#222" text-anchor="middle">localhost)</text>
+<polyline points="270,65 860,65 860,230" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="439.9" y="57.0" width="240.20000000000002" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="560" y="68.0" font-size="10" fill="#222" text-anchor="middle">HTTP :4040 inspector del agente (localhost)</text>
+<polyline points="270,275 450,275" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="277.7" y="255.0" width="164.60000000000002" height="40" fill="#fff" fill-opacity="0.92"/>
+<text x="360" y="266.0" font-size="10" fill="#222" text-anchor="middle">REST /api</text>
+<text x="360" y="278.0" font-size="10" fill="#222" text-anchor="middle">SignalR WebSocket /hubs/inbox</text>
+<text x="360" y="290.0" font-size="10" fill="#222" text-anchor="middle">(proxy nginx → api:8080)</text>
+<polyline points="800,290 630,290" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="651.6" y="292.0" width="126.80000000000001" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="715" y="303.0" font-size="10" fill="#222" text-anchor="middle">HTTP :8081</text>
+<text x="715" y="315.0" font-size="10" fill="#222" text-anchor="middle">POST /telegram/webhook</text>
+<polyline points="560,230 560,190 930,190 930,230" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="595.2" y="182.0" width="299.6" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="745" y="193.0" font-size="10" fill="#222" text-anchor="middle">HTTP :4040 descubrimiento del túnel (GET /api/tunnels)</text>
+<polyline points="520,320 520,450" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="410.7" y="371.0" width="218.60000000000002" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="520" y="382.0" font-size="10" fill="#222" text-anchor="middle">AMQP 5672: publica inbox.incoming</text>
+<text x="520" y="394.0" font-size="10" fill="#222" text-anchor="middle">y inbox.outgoing; suscribe inbox.events</text>
+<polyline points="560,670 560,540" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="456.1" y="591.0" width="207.8" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="560" y="602.0" font-size="10" fill="#222" text-anchor="middle">AMQP 5672: consume incoming/outgoing,</text>
+<text x="560" y="614.0" font-size="10" fill="#222" text-anchor="middle">publica inbox.events</text>
+<polyline points="620,320 620,420 885,420 885,540" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="686.1" y="412.0" width="207.8" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="790" y="423.0" font-size="10" fill="#222" text-anchor="middle">SQL 5432 (Npgsql; aplica migraciones)</text>
+<polyline points="630,700 885,700 885,640" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="710.1" y="692.0" width="99.80000000000001" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="760" y="703.0" font-size="10" fill="#222" text-anchor="middle">SQL 5432 (Npgsql)</text>
+<polyline points="1180,270 970,270" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="1013.5" y="238.0" width="143.0" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="1085" y="249.0" font-size="10" fill="#222" text-anchor="middle">túnel TLS hacia el agente</text>
+<text x="1085" y="261.0" font-size="10" fill="#222" text-anchor="middle">(webhook entrante)</text>
+<polyline points="1270,420 1270,310" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="1176.9" y="351.0" width="186.20000000000002" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="1270" y="362.0" font-size="10" fill="#222" text-anchor="middle">HTTPS webhook :443</text>
+<text x="1270" y="374.0" font-size="10" fill="#222" text-anchor="middle">(X-Telegram-Bot-Api-Secret-Token)</text>
+<polyline points="1270,620 1270,500" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="1209.3" y="546.0" width="121.4" height="28" fill="#fff" fill-opacity="0.92"/>
+<text x="1270" y="557.0" font-size="10" fill="#222" text-anchor="middle">Mensajes y respuestas</text>
+<text x="1270" y="569.0" font-size="10" fill="#222" text-anchor="middle">(app de Telegram)</text>
+<polyline points="600,320 600,380 1100,380 1100,440 1180,440" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="806.9" y="372.0" width="186.20000000000002" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="900" y="383.0" font-size="10" fill="#222" text-anchor="middle">HTTPS setWebhook / getWebhookInfo</text>
+<polyline points="630,735 1080,735 1080,480 1180,480" fill="none" stroke="#444" stroke-width="1.5" marker-end="url(#a)"/>
+<rect x="820.1" y="727.0" width="99.80000000000001" height="16" fill="#fff" fill-opacity="0.92"/>
+<text x="870" y="738.0" font-size="10" fill="#222" text-anchor="middle">HTTPS sendMessage</text>
+<text x="20" y="796" font-size="10" fill="#555">Leyenda: azul = contenedor propio o de infraestructura, gris = sistema externo, línea punteada = límite de Docker Compose. Puertos del host solo en 127.0.0.1.</text>
+</svg>

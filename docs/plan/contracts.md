@@ -180,13 +180,13 @@ Startup **fails fast** with a clear error if a required key is **missing or malf
 ### 7.5 RabbitMQ publishing rules
 - Work messages (`inbox.incoming`, `inbox.outgoing`) are published with `mandatory: true`, persistent delivery and publisher confirms (5 s). A **basic.return** (unroutable) counts as a failure: the webhook returns 503, and for an outbound reply the row stays Pending and the sweeper retries it.
 - Events (`inbox.events`) are transient, with no confirms and not mandatory. If an event publish fails **after** the commit, the worker nacks with requeue. Re-processing is idempotent, and duplicate events are harmless.
-- Quorum `x-delivery-limit: 5`: a message is dead-lettered when its delivery count **exceeds** 5, which means up to 6 deliveries.
+- Quorum `x-delivery-limit: 5`: kept as a backstop only (it counts broker-side returns such as crashes or channel closes, not consumer requeues on RabbitMQ 4.3). The application decides when a message goes to the DLQ.
 - **Consumer error classes (revision 3, R-1 review, human P-015):**
   | Class | Examples | Action |
   |---|---|---|
   | Poison | JSON errors, `PoisonMessageException`, `DomainException` | nack, no requeue → DLQ |
   | Infrastructure | **transient** `DbException` (`IsTransient: true`), `TimeoutException`, broker connection errors when publishing events | **retry in process without limit**, backoff 1, 2, 4… capped at 30 s, until it succeeds (or shutdown, which leaves the message un-acked for redelivery). The DLQ is never used for infrastructure outages. |
-  | Other unexpected | anything else, including non-transient `DbException` | 3 in-process retries (1, 2, 4 s), then nack with requeue; the delivery limit then sends it to the DLQ |
+  | Other unexpected | anything else, including non-transient `DbException` | 3 in-process retries (1, 2, 4 s), then **nack without requeue → DLQ** (revision 5, QA-D1: on RabbitMQ 4.3 a consumer `nack(requeue=true)` does not increment `x-delivery-count`, so the delivery limit cannot be relied on for this) |
 - **Outbound, no resend in process (revision 4, D-087):** once Telegram returned a final outcome, `DeliverReply` retries **only the persistence**, **without limit and for any error** (capped backoff, Critical log), and never calls `sendMessage` again within the same delivery. It is never dead-lettered. The accepted cost is that a non-recovering DB write error blocks outbound replies until it is fixed (inbound is unaffected). A duplicate is only possible if the process dies, or the broker's `consumer_timeout` (30 min) returns the message, during that window (ADR-004 at-least-once).
 - **Delivery cancellation (N-6):** the in-flight handler is cancelled only on shutdown or when the broker drops the subscription on a live connection; a connection loss handled by automatic recovery does not cancel it.
 - **Transient persistence errors (N-9):** Infrastructure translates them into the Application type `TransientPersistenceException`; Application never references ADO.NET or EF types.

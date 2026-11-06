@@ -49,6 +49,22 @@ public sealed class ConversationReadTests
     }
 
     [Fact]
+    public void MarkConversationReadUpTo_OutboundReplies_AreNotCountedNorChanged()
+    {
+        var contact = TestData.Contact();
+        var inbound = TestData.Inbound(contact.Id, 1, TestData.Now).WithSeq(1);
+        var reply = TestData.Outbound(contact.Id).WithSeq(2);
+        var latest = TestData.Inbound(contact.Id, 2, TestData.Now.AddSeconds(1)).WithSeq(3);
+        var readAt = TestData.Now.AddMinutes(1);
+
+        var changed = contact.MarkConversationReadUpTo(latest, [inbound, reply, latest], readAt);
+
+        Assert.Equal(2, changed);
+        Assert.Equal(TestData.Now, reply.ReadAt);
+        Assert.Equal(readAt, latest.ReadAt);
+    }
+
+    [Fact]
     public void MarkConversationReadUpTo_UpToFromAnotherContact_Throws()
     {
         var contact = TestData.Contact(1);

@@ -1,0 +1,10 @@
+Fix round R-4 for backend (approved by the human as a 4th round): QA found two defects in QueueConsumer. Same rules as before (own paths, no git state changes, containers as your user, do not touch the running compose stack, throwaway stacks only on separate networks/ports, remove them afterwards, and do NOT run `docker volume prune`; remove only your own containers with `docker rm -f -v` and your own networks).
+
+Read contracts §7.5 (revision 5) and D-093, D-094 first.
+
+1. QA-D1 (major, D-093): on RabbitMQ 4.3.7 a consumer basic.nack(requeue=true) does NOT increment x-delivery-count (QA saw 29 requeues with x-delivery-count stuck at 1), so the "Other unexpected" class never reaches the DLQ and loops forever. Change: after the 3 in-process retries (1, 2, 4 s), nack WITHOUT requeue → DLQ. Keep x-delivery-limit only as a backstop. Poison and transient-infrastructure classes are unchanged, and so is the post-send save loop (D-087).
+   Evidence required: on a throwaway stack force an "unexpected" non-transient DB error (e.g. a temporary CHECK constraint that rejects the insert) and show the message lands in the DLQ after ~7 s, once.
+2. QA-D2 (minor, D-094): during a broker restart, a connection-loss close event for a channel was handled 26 s late (after recovery), when IConnection.IsOpen was already true again, so it was treated as a lost subscription and the consumer was recreated (which could cancel an in-flight send). Decide from the channel's own ShutdownEventArgs instead (e.g. a connection-level close / the reply code and initiator say the connection died → leave it to automatic recovery; a server channel close or basic.cancel on a live connection → lost subscription). Keep N-6/D-088 semantics.
+   Evidence: broker `docker restart` while a handler is busy on the other queue: no spurious "Lost the subscription", 1 consumer per queue afterwards.
+
+Verify: dotnet build (0 warnings), dotnet test (69 tests, all passing). Report in the usual 5-section format.

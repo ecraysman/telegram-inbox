@@ -14,7 +14,7 @@ public enum ConsumerErrorClass
     /// <summary>A dependency is down (transient database error, broker, timeout): retry in process without limit.</summary>
     Infrastructure,
 
-    /// <summary>Anything else: bounded retry, then requeue (the delivery limit eventually dead-letters it).</summary>
+    /// <summary>Anything else (including a non-transient database error): 3 retries, then dead-letter it (D-093).</summary>
     Unexpected,
 }
 

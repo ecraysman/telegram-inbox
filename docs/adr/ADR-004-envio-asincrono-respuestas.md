@@ -4,35 +4,35 @@
 
 ## Contexto
 
-El operador responde desde la bandeja y la respuesta tiene que llegar al usuario en Telegram (3.1.5). Telegram puede tardar, limitar (429), rechazar (403: el usuario bloqueó el bot) o estar caído. Queremos que **ninguna respuesta se pierda en silencio** y que el operador vea en todo momento en qué estado está cada una. Además, `sendMessage` de Telegram **no tiene clave de idempotencia**.
+El operador responde desde la bandeja y la respuesta tiene que llegar al usuario en Telegram (3.1.5). Telegram puede tardar, limitar (429), rechazar (403: el usuario bloqueó el bot) o estar caído, y `sendMessage` **no tiene clave de idempotencia**. Queremos que **ninguna respuesta se pierda en silencio** y que el operador vea siempre el estado de cada una.
 
 ## Alternativas consideradas
 
 | Opción | Ventajas | Desventajas |
 |---|---|---|
-| **Síncrona:** la api llama a `sendMessage` y persiste solo si tuvo éxito. | Simple, con feedback inmediato y sin estados intermedios. | Si Telegram está caído, la respuesta falla y el operador reintenta a mano. Si la escritura en base falla después del envío, el mensaje llega pero no se ve. |
-| **Asíncrona con cola** (elegida) | Sobrevive a caídas de Telegram, con reintentos automáticos y un estado de entrega visible y auditable. | Requiere una máquina de estados, estados en la UI y política de reintentos. |
-| Tabla *outbox* separada + *dispatcher* | Es el patrón de libro para "guardar y publicar" de forma atómica. | Duplica estado: el mensaje ya es un registro persistente. |
+| **Síncrona** (enviar y luego guardar) | Simple, con feedback inmediato. | Con Telegram caído la respuesta falla. Si falla el guardado, el mensaje llega pero no se ve. |
+| **Asíncrona con cola** (elegida) | Sobrevive a caídas de Telegram, con reintentos y estado visible. | Máquina de estados, estados en la UI y política de reintentos. |
+| Tabla *outbox* separada | Patrón de libro para guardar y publicar de forma atómica. | Duplica estado: el mensaje ya es un registro persistente. |
 
 ## Decisión
 
 Respuesta **asíncrona por RabbitMQ**, con la **fila del mensaje como outbox**:
 
-1. **api:** valida el texto (no vacío y como máximo 4096 caracteres) y guarda el mensaje saliente en estado **`Pending`**. Publica `OutgoingTextMessage v1 {messageId}` con confirmación y responde **202**.
-2. **worker** (`inbox.outgoing.telegram`, `prefetch 1`): si el mensaje ya no está `Pending`, hace ack y termina (idempotente). Si sigue `Pending`, llama a `sendMessage`:
-   - Éxito → **`Sent`**, guardando el `message_id` de Telegram.
-   - 429 → hasta 3 reintentos esperando `retry_after` (con tope de 10 s). 5xx/red → 3 reintentos (1/2/4 s). Si siguen fallando, **`Failed`**.
-   - Cualquier otro 4xx (400, 401, 403, 404) → **`Failed`** sin reintento.
-3. Cada cambio de estado se persiste y se emite (`messageStatusChanged`). Un `Failed` se **acepta (ack) y se muestra**: no queda escondido en la DLQ, que se reserva para mensajes venenosos.
-4. **Barredor** del worker (cada 30 s): re-publica los `Pending` con más de 60 s. Esto cubre el caso de "guardado pero nunca publicado", por ejemplo si la api se cae entre el commit y la publicación. Si el broker no confirma, la api igual responde 202: el mensaje está seguro en la base y el barredor lo publicará.
-5. **Reintento manual:** `POST /api/messages/{id}/retry` pasa `Failed → Pending`. Es un botón "Reintentar" en la UI.
+1. **api:** valida el texto, guarda el mensaje en estado **`Pending`**, publica `OutgoingTextMessage v1` y responde **202**.
+2. **worker:** si el mensaje ya no está `Pending`, solo re-emite su estado. Si sigue `Pending`, llama a `sendMessage`:
+   - Éxito → **`Sent`**.
+   - 429 o 5xx/red → 3 reintentos (`retry_after` con tope de 10 s), y luego **`Failed`**.
+   - Otro 4xx → **`Failed`** sin reintento.
+3. Con el resultado final se reintenta **solo el guardado**, nunca el envío. Un `Failed` se muestra al operador; la DLQ queda para mensajes venenosos.
+4. **Barredor** (cada 30 s): re-publica los `Pending` viejos. Cubre el caso "guardado pero nunca publicado".
+5. **Reintento manual:** `POST /api/messages/{id}/retry` pasa `Failed → Pending` (botón "Reintentar").
 
-Las transiciones (`Pending → Sent | Failed`, `Failed → Pending`) son **reglas del dominio**: una transición inválida lanza una excepción y está cubierta por tests unitarios.
+Las transiciones son **reglas del dominio**, cubiertas por tests unitarios.
 
 ## Consecuencias
 
-- **Ganamos:** ninguna respuesta se pierde en silencio y las caídas de Telegram se absorben. El operador ve el estado de cada respuesta (reloj, ✓, ⚠ + "Reintentar"). La respuesta conserva su posición en la conversación (orden por momento de escritura + secuencia).
+- **Ganamos:** ninguna respuesta se pierde en silencio, las caídas de Telegram se absorben y el operador ve el estado (reloj, ✓, ⚠ + "Reintentar").
 - **Resignamos:** simplicidad: estados en el dominio y en la UI, un barredor y un endpoint extra.
-- **Riesgo aceptado: entrega *at-least-once*.** Una vez que Telegram aceptó el mensaje, el worker nunca lo reenvía en el mismo intento: solo reintenta guardar `Sent`. Puede haber un duplicado si el worker se cae antes de guardarlo, o si Telegram aceptó el mensaje pero la respuesta no llegó (timeout de red). La alternativa *at-most-once* (estado `Sending`) convierte ese caso en una **pérdida silenciosa**, y en atención al cliente un duplicado raro es preferible.
-- **Riesgo aceptado: bloqueo ante una falla persistente al guardar.** Si Telegram aceptó el mensaje pero la base no permite guardar `Sent` (por ejemplo, un error de permisos o un bug), el worker reintenta guardar indefinidamente y **no reenvía**, salvo que el broker devuelva el mensaje por `consumer_timeout` (una vez cada 30 min mientras dure la falla). Las respuestas salientes quedan en cola hasta que se corrige la base; los entrantes siguen funcionando. Se ve en logs críticos, en la cola creciente de RabbitMQ y en el ícono de reloj en la UI. Preferimos una demora visible a un mensaje duplicado. **Evolución:** un estado `Sending` guardado antes de llamar a Telegram, que el barredor ignora y que, si queda colgado, pasa a `Failed` con "estado de entrega desconocido" para que decida el operador. Elimina duplicados y bloqueos, a cambio de entrega *at-most-once* automática. Se adoptaría si esta falla aparece en la práctica.
-- **Riesgo aceptado: envío serial.** Un consumidor con `prefetch 1` mantiene el orden por conversación. Pero con Telegram caído, cada respuesta espera los reintentos de la anterior: unos 7 s ante errores 5xx o de red, y hasta unos 30 s si Telegram limita con 429. Es aceptable **hasta llegar a cientos de conversaciones activas *y* con Telegram degradado a la vez**. Entonces se particiona la cola por contacto (*consistent-hash exchange*) o se usan colas de reintento con demora.
+- **Riesgo aceptado: *at-least-once*.** Puede haber un duplicado si el worker se cae antes de guardar `Sent`, o si Telegram aceptó el mensaje pero su respuesta no llegó (timeout). La alternativa *at-most-once* convierte esos casos en pérdidas, y en atención al cliente un duplicado raro es preferible.
+- **Riesgo aceptado: bloqueo ante una falla persistente al guardar.** Si la base no deja guardar `Sent`, el worker reintenta indefinidamente sin reenviar, salvo que el broker devuelva el mensaje por `consumer_timeout` (una vez cada 30 min). Las salientes esperan hasta que se corrige la base; los entrantes siguen funcionando. Preferimos una demora visible (logs críticos, cola creciente, reloj en la UI) a un duplicado. **Evolución:** un estado `Sending` previo al envío, que el barredor ignora y que, si queda colgado, pasa a `Failed` ("estado desconocido") para que decida el operador.
+- **Riesgo aceptado: envío serial.** Un solo consumidor mantiene el orden, pero con Telegram caído cada respuesta espera los reintentos de la anterior (unos 7 s; hasta 30 s ante 429). Es aceptable hasta llegar a **cientos de conversaciones activas con Telegram degradado**. Entonces se particiona la cola por contacto o se usan colas de reintento con demora.

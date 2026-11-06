@@ -201,6 +201,59 @@ public sealed class MessageTests
         Assert.Throws<DomainException>(() => TestData.Outbound(ContactId).MarkSent(1, DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(3))));
 
     [Fact]
+    public void Outbound_EmptyContact_Throws() =>
+        Assert.Throws<DomainException>(() => Message.Outbound(Guid.Empty, TestData.Text(), TestData.Now));
+
+    [Fact]
+    public void RequeueForRetry_NonUtcTime_Throws()
+    {
+        var message = TestData.Outbound(ContactId);
+        message.MarkFailed("unavailable: timeout");
+
+        Assert.Throws<DomainException>(() => message.RequeueForRetry(DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(-3))));
+    }
+
+    [Fact]
+    public void RecordRequeued_NonUtcTime_Throws() =>
+        Assert.Throws<DomainException>(() => TestData.Outbound(ContactId).RecordRequeued(DateTimeOffset.Now.ToOffset(TimeSpan.FromHours(-3))));
+
+    [Fact]
+    public void MarkFailed_AlreadyFailed_KeepsTheOriginalReason()
+    {
+        var message = TestData.Outbound(ContactId);
+        message.MarkFailed("rejected: Forbidden: bot was blocked by the user");
+
+        Assert.Throws<DomainException>(() => message.MarkFailed("unavailable: timeout"));
+        Assert.Equal("rejected: Forbidden: bot was blocked by the user", message.FailureReason);
+    }
+
+    [Fact]
+    public void MarkSent_AlreadySent_KeepsTheFirstTelegramData()
+    {
+        var message = TestData.Outbound(ContactId);
+        message.MarkSent(777, TestData.Now.AddSeconds(1));
+
+        Assert.Throws<DomainException>(() => message.MarkSent(888, TestData.Now.AddSeconds(5)));
+        Assert.Equal(777, message.TelegramMessageId);
+        Assert.Equal(TestData.Now.AddSeconds(1), message.DeliveredAt);
+    }
+
+    [Fact]
+    public void Outbound_ThroughFailAndRetry_IsNeverUnreadAndKeepsItsPosition()
+    {
+        var message = TestData.Outbound(ContactId);
+
+        message.MarkFailed("unavailable: timeout");
+        message.RequeueForRetry(TestData.Now.AddMinutes(5));
+        message.MarkSent(9, TestData.Now.AddMinutes(5));
+
+        Assert.False(message.IsUnread);
+        Assert.Equal(TestData.Now, message.ReadAt);
+        Assert.Equal(TestData.Now, message.OccurredAt);
+        Assert.Null(message.FailureReason);
+    }
+
+    [Fact]
     public void IsAtOrBefore_OrdersByOccurredAtThenSeq()
     {
         var early = TestData.Inbound(ContactId, 1, TestData.Now).WithSeq(5);

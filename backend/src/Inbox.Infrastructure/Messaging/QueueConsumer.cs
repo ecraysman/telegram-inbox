@@ -13,7 +13,8 @@ namespace Inbox.Infrastructure.Messaging;
 /// Base consumer for a work queue: prefetch 1, manual ack after the handler (which commits) succeeds.
 /// Error classes per contracts §7.5 (<see cref="ConsumerErrorClassifier"/>): poison → nack without requeue (DLQ);
 /// infrastructure → retried in process without limit (1, 2, 4… capped at 30 s); anything else → 3 retries (1, 2, 4 s),
-/// then nack with requeue, and the quorum delivery limit eventually dead-letters it.
+/// then nack without requeue → DLQ (D-093: on RabbitMQ 4.3 a consumer nack with requeue does not advance
+/// x-delivery-count, so x-delivery-limit is only a backstop).
 /// </summary>
 public abstract partial class QueueConsumer<TMessage>(
     RabbitMqConnection connection,
@@ -57,9 +58,13 @@ public abstract partial class QueueConsumer<TMessage>(
 
                 channel.ChannelShutdownAsync += (_, args) =>
                 {
+                    // Decided from the event itself, not from IConnection.IsOpen when it is handled (D-094): a late
+                    // connection-loss event can arrive after recovery, when the connection is open again.
                     if (args.Initiator != ShutdownInitiator.Application)
                     {
-                        session.OnBrokerEvent(amqp.IsOpen, $"channel closed by the broker: {args.ReplyCode} {args.ReplyText}");
+                        session.OnBrokerEvent(
+                            IsChannelLevelClose(args),
+                            $"channel closed by the broker: {args.ReplyCode} {args.ReplyText}");
                     }
 
                     return Task.CompletedTask;
@@ -67,15 +72,13 @@ public abstract partial class QueueConsumer<TMessage>(
 
                 await RabbitMqTopology.DeclareAsync(channel, stoppingToken);
                 await channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false, stoppingToken);
-                var consumer = new AsyncEventingBasicConsumer(channel);
-                consumer.UnregisteredAsync += (_, _) =>
-                {
-                    // This service never cancels its consumer itself, so this is the broker's basic.cancel.
-                    session.OnBrokerEvent(amqp.IsOpen, "basic.cancel from the broker, e.g. consumer_timeout or a queue restart");
-                    return Task.CompletedTask;
-                };
                 var subscribed = channel;
-                consumer.ReceivedAsync += (_, delivery) => OnReceivedAsync(subscribed, session, delivery, stoppingToken);
+                var consumer = new WorkQueueConsumer(
+                    channel,
+                    delivery => OnReceivedAsync(subscribed, session, delivery, stoppingToken),
+                    () => session.OnBrokerEvent(
+                        subscriptionLost: true,
+                        "basic.cancel from the broker, e.g. consumer_timeout or a deleted queue"));
                 await channel.BasicConsumeAsync(QueueName, autoAck: false, consumer, stoppingToken);
                 LogConsuming(logger, QueueName);
                 consecutiveFailures = 0;
@@ -110,10 +113,19 @@ public abstract partial class QueueConsumer<TMessage>(
         }
     }
 
-    private async Task OnReceivedAsync(IChannel channel, ConsumerSession session, BasicDeliverEventArgs delivery, CancellationToken stoppingToken)
+    /// <summary>
+    /// A server close of just the channel uses a soft (channel-level) AMQP reply code; a dying connection shows up as
+    /// a hard code (320 CONNECTION_FORCED, 501–541) from the peer or as a library-initiated close (network, heartbeat).
+    /// </summary>
+    private static bool IsChannelLevelClose(ShutdownEventArgs args) =>
+        args.Initiator == ShutdownInitiator.Peer
+        && args.ReplyCode is Constants.ContentTooLarge or Constants.NoRoute or Constants.NoConsumers
+            or Constants.AccessRefused or Constants.NotFound or Constants.ResourceLocked or Constants.PreconditionFailed;
+
+    private async Task OnReceivedAsync(IChannel channel, ConsumerSession session, WorkQueueDelivery delivery, CancellationToken stoppingToken)
     {
-        var messageId = delivery.BasicProperties.MessageId;
-        var target = new DeliveryTarget(channel, session, session.Generation, delivery.DeliveryTag);
+        var messageId = delivery.MessageId;
+        var target = new DeliveryTarget(channel, session, session.Generation, delivery.Tag);
 
         // Its token is cancelled only on shutdown or when the broker dropped the subscription on a live connection; then
         // the broker has requeued the message and any retry for it stops. A connection loss does not cancel it.
@@ -131,7 +143,7 @@ public abstract partial class QueueConsumer<TMessage>(
 
         try
         {
-            await ProcessAsync(target, delivery, messageId, cancellationToken);
+            await ProcessAsync(target, delivery.Body, messageId, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -146,12 +158,12 @@ public abstract partial class QueueConsumer<TMessage>(
         }
     }
 
-    private async Task ProcessAsync(DeliveryTarget target, BasicDeliverEventArgs delivery, string? messageId, CancellationToken cancellationToken)
+    private async Task ProcessAsync(DeliveryTarget target, ReadOnlyMemory<byte> body, string? messageId, CancellationToken cancellationToken)
     {
         TMessage message;
         try
         {
-            message = JsonSerializer.Deserialize<TMessage>(delivery.Body.Span, InboxJson.Options)
+            message = JsonSerializer.Deserialize<TMessage>(body.Span, InboxJson.Options)
                 ?? throw new JsonException("The payload is null.");
         }
         catch (JsonException ex)
@@ -199,8 +211,8 @@ public abstract partial class QueueConsumer<TMessage>(
                     default:
                         if (unexpectedFailures == MaxUnexpectedRetries)
                         {
-                            LogRequeue(logger, ex, QueueName, messageId);
-                            await SettleAsync(target, ack: false, requeue: true);
+                            LogDeadLettered(logger, ex, QueueName, messageId, MaxUnexpectedRetries);
+                            await SettleAsync(target, ack: false, requeue: false);
                             return;
                         }
 
@@ -291,9 +303,13 @@ public abstract partial class QueueConsumer<TMessage>(
 
         public Task<string> Lost => _reason.Task;
 
-        public void OnBrokerEvent(bool connectionOpen, string reason)
+        /// <param name="subscriptionLost">
+        /// True for a server basic.cancel or a channel-level close; false for a connection loss, which automatic
+        /// recovery handles (only the tag generation advances, and nothing in flight is cancelled: N-6, D-088).
+        /// </param>
+        public void OnBrokerEvent(bool subscriptionLost, string reason)
         {
-            if (!connectionOpen)
+            if (!subscriptionLost)
             {
                 Interlocked.Increment(ref _generation);
                 return;
@@ -330,6 +346,6 @@ public abstract partial class QueueConsumer<TMessage>(
     [LoggerMessage(Level = LogLevel.Warning, Message = "Unexpected failure on {Queue} for {MessageId} (retry {Retry} in {DelaySeconds}s)")]
     private static partial void LogUnexpected(ILogger logger, Exception exception, string queue, string? messageId, int retry, double delaySeconds);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Still failing on {Queue} for {MessageId} after retries; requeueing")]
-    private static partial void LogRequeue(ILogger logger, Exception exception, string queue, string? messageId);
+    [LoggerMessage(Level = LogLevel.Error, Message = "Still failing on {Queue} for {MessageId} after {Retries} retries; dead-lettering it")]
+    private static partial void LogDeadLettered(ILogger logger, Exception exception, string queue, string? messageId, int retries);
 }
