@@ -1,3 +1,5 @@
+[Privacy edit (D-105): the local absolute path of the repository is replaced with <repo>. Otherwise verbatim.]
+
 You are part of a small agent team building a technical challenge for encodelabs:
 a web inbox where an operator receives and answers Telegram bot messages in real time.
 

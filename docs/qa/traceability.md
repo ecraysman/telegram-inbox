@@ -1,8 +1,8 @@
 # Trazabilidad y auditoría de desvíos (Step #10)
 
-> Autor: A0 (orquestador). Fecha: 2026-11-06. Commit auditado: `7202599` (más las correcciones de documentación de este paso).
+> Autor: A0 (orquestador). Fecha: 2026-11-06. Commit auditado: `7202599` (más las correcciones de documentación de este paso). Actualizado el mismo día: prueba en vivo aprobada por el humano, G3 cerrado (D-103).
 > Método: cada fila se contrastó con el código (`grep` y lectura de los archivos citados) y con la evidencia de QA (`docs/qa/verification-report.md`, abreviado **VR**). Nada se marca como cumplido solo porque un documento lo afirma.
-> Estados: ✅ cumplido · ⚠️ desvío aceptado (ver §3) · 🔁 reemplazado por una decisión posterior · ⏳ pendiente de la prueba humana.
+> Estados: ✅ cumplido · ⚠️ desvío aceptado (ver §3) · 🔁 reemplazado por una decisión posterior. La prueba en vivo la hizo el humano (D-103): su evidencia es esa confirmación, no un registro automático.
 
 ## 1. Requisitos → decisión → código → evidencia
 
@@ -10,11 +10,11 @@
 
 | # | Requisito | Decisión | Código | Evidencia | Estado |
 |---|---|---|---|---|---|
-| 1 | Recibir en tiempo real los mensajes de texto | ADR-002, ADR-003, D-011, D-015 | `Api/Endpoints/TelegramWebhookEndpoint.cs` → `Application/UseCases/AcceptIncomingMessage.cs` → `Worker/Consumers/IncomingMessageConsumer.cs` → `UseCases/ProcessIncomingMessage.cs` → `Messaging/RabbitMqInboxNotifier.cs` → `Messaging/InboxEventsSubscriber.cs` → `Api/RealTime/SignalRInboxNotifier.cs` | VR §2 3.1.1 y §6: `messageReceived` ~0,3 s después del webhook, también a través de nginx | ✅ simulado · ⏳ con Telegram real |
-| 2 | Contactos con nombre/username, no leídos y vista previa | D-022, D-026 | `Infrastructure/Persistence/InboxQueries.cs:50` (conteo y último mensaje en SQL), `Domain/Contacts/Contact.cs` (`DisplayName`, `UpdateProfile`), `frontend/.../contacts/contact-list.*` | VR §2 3.1.2: `GET /api/contacts` con `displayName`, `unreadCount` y `lastMessage` | ✅ API · ⏳ UI |
-| 3 | Abrir una conversación y ver su historial | D-016 | `InboxQueries.cs:34` (`occurred_at`, `seq`), `features/conversation/conversation-panel.*` | VR §2 3.1.3 | ✅ API · ⏳ UI |
-| 4 | Marcar como leídos al abrir | D-023, D-024, D-065 | `Contact.MarkConversationReadUpTo` (`Contact.cs:77`), `UseCases/MarkConversationAsRead.cs`, `state/inbox.store.ts:185` | VR §2 3.1.4 (parcial, idempotente, un solo evento); 5 tests en `ConversationReadTests.cs` | ✅ API · ⏳ UI |
-| 5 | Responder; la respuesta llega a Telegram | D-021, D-029..D-032, ADR-004 | `UseCases/QueueReply.cs`, `UseCases/DeliverReply.cs`, `Telegram/TelegramGateway.cs:24`, `Worker/Outbox/OutboxSweeperService.cs` | VR §6: `202 pending` → worker → Bot API real (401 con token falso → `failed`) | ⏳ un `sendMessage` exitoso solo se ve con el bot real (checklist pasos 5–6) |
+| 1 | Recibir en tiempo real los mensajes de texto | ADR-002, ADR-003, D-011, D-015 | `Api/Endpoints/TelegramWebhookEndpoint.cs` → `Application/UseCases/AcceptIncomingMessage.cs` → `Worker/Consumers/IncomingMessageConsumer.cs` → `UseCases/ProcessIncomingMessage.cs` → `Messaging/RabbitMqInboxNotifier.cs` → `Messaging/InboxEventsSubscriber.cs` → `Api/RealTime/SignalRInboxNotifier.cs` | VR §2 3.1.1 y §6: `messageReceived` ~0,3 s después del webhook, también a través de nginx | ✅ simulado · ✅ con Telegram real (D-103) |
+| 2 | Contactos con nombre/username, no leídos y vista previa | D-022, D-026 | `Infrastructure/Persistence/InboxQueries.cs:50` (conteo y último mensaje en SQL), `Domain/Contacts/Contact.cs` (`DisplayName`, `UpdateProfile`), `frontend/.../contacts/contact-list.*` | VR §2 3.1.2: `GET /api/contacts` con `displayName`, `unreadCount` y `lastMessage` | ✅ API · ✅ UI (D-103) |
+| 3 | Abrir una conversación y ver su historial | D-016 | `InboxQueries.cs:34` (`occurred_at`, `seq`), `features/conversation/conversation-panel.*` | VR §2 3.1.3 | ✅ API · ✅ UI (D-103) |
+| 4 | Marcar como leídos al abrir | D-023, D-024, D-065 | `Contact.MarkConversationReadUpTo` (`Contact.cs:77`), `UseCases/MarkConversationAsRead.cs`, `state/inbox.store.ts:185` | VR §2 3.1.4 (parcial, idempotente, un solo evento); 5 tests en `ConversationReadTests.cs` | ✅ API · ✅ UI (D-103) |
+| 5 | Responder; la respuesta llega a Telegram | D-021, D-029..D-032, ADR-004 | `UseCases/QueueReply.cs`, `UseCases/DeliverReply.cs`, `Telegram/TelegramGateway.cs:24`, `Worker/Outbox/OutboxSweeperService.cs` | VR §6: `202 pending` → worker → Bot API real (401 con token falso → `failed`) | ✅ `sendMessage` exitoso con el bot real (checklist pasos 5–6, D-103) |
 
 ### 1.2 Técnicos (§3.2)
 
@@ -24,10 +24,10 @@
 | Angular última estable | D-005, D-062 | `frontend/package.json` (`@angular/core` 22.2.x, zoneless, sin zone.js) | VR §3. Angular pasó a un ciclo anual: Angular 23 está previsto para junio de 2027 | ✅ |
 | Base de datos a elección | D-004, ADR-001 | `Persistence/InboxDbContext.cs`, `Configurations/*`, migración `InitialCreate` | VR §3: migraciones al iniciar; `ON CONFLICT` probado en VR §6 | ✅ |
 | RabbitMQ para entrantes | D-009, D-012..D-015, D-033, ADR-003 | `Messaging/RabbitMqTopology.cs`, `RabbitMqPublisher.cs:37` (`mandatory`, confirm), `QueueConsumer.cs:74` (`prefetch 1`) | VR §3 (topología live, 1 consumidor por cola), VR §7 (broker caído → 503, veneno → DLQ) | ✅ |
-| Tiempo real | D-017, ADR-002, D-063, D-064 | `Api/RealTime/InboxHub.cs`, `core/realtime.service.ts:62` (reconexión sin fin), `:72` (refetch al reconectar) | VR §3 (negociación y WebSocket por nginx) | ✅ backend · ⏳ navegador |
+| Tiempo real | D-017, ADR-002, D-063, D-064 | `Api/RealTime/InboxHub.cs`, `core/realtime.service.ts:62` (reconexión sin fin), `:72` (refetch al reconectar) | VR §3 (negociación y WebSocket por nginx) | ✅ backend · ✅ navegador (D-103) |
 | Bot propio + webhook automático con ngrok | D-018, D-019, D-042 | `Api/Webhooks/WebhookRegistrationService.cs`, `UseCases/RegisterWebhook.cs`, `Ngrok/NgrokPublicUrlProvider.cs` | VR §3: log de registro y `getWebhookInfo` con la URL de ngrok y `allowed_updates=['message']` | ✅ (el re-registro ante un cambio de URL no se verificó en vivo, VR §7) |
 | ngrok expone el webhook | D-020, D-044 | `docker-compose.yml:63` (`ngrok http api:8081`), `Api/PortIsolationMiddleware.cs:14` | VR §5: todo lo que no es el webhook → 404 por la URL pública; webhook sin secreto → 401 | ✅ |
-| `docker compose up` tras completar `.env` | D-038, D-041, D-057, D-058, D-060 | `docker-compose.yml` (6 servicios, healthchecks, `depends_on`), `.env.example` | VR §3: stack live sano. Reconstruido con R-4 (`7202599`): sano, 1 consumidor por cola | ✅ · ⏳ desde un `.env` limpio (checklist paso 1) |
+| `docker compose up` tras completar `.env` | D-038, D-041, D-057, D-058, D-060 | `docker-compose.yml` (6 servicios, healthchecks, `depends_on`), `.env.example` | VR §3: stack live sano. Reconstruido con R-4 (`7202599`): sano, 1 consumidor por cola | ✅ · ✅ desde un `.env` limpio (checklist paso 1, D-103) |
 
 ### 1.3 Fuera de alcance (§3.3), diseño (§4) y condiciones (§6)
 
@@ -36,7 +36,7 @@
 | Sin autenticación ni usuarios | D-027, D-020 | No hay login; la API solo se publica en `127.0.0.1` y no por ngrok (VR §4–§5) | ✅ |
 | Solo texto | D-025 | `TelegramUpdateMapper.cs:12`; sticker, foto, edición y grupo → 200 y sin filas (VR §4) | ✅ |
 | Sin responsive ni paginación | AGENTS §6 | `GET …/messages` devuelve el historial completo (VR §4) | ✅ |
-| Layout de dos paneles y estilo similar a encodelabs | `docs/plan/ui-style.md`, D-067 | Tokens reales de encodelabs (Red Hat Display, marca `oklch(0.499 0.082 209)`) en `frontend/src/styles.css` | ⏳ revisión visual humana |
+| Layout de dos paneles y estilo similar a encodelabs | `docs/plan/ui-style.md`, D-067 | Tokens reales de encodelabs (Red Hat Display, marca `oklch(0.499 0.082 209)`) en `frontend/src/styles.css` | ✅ revisión visual humana (D-103) |
 | `.env` fuera del repositorio | AGENTS §7.1 | `.gitignore`; búsqueda de secretos sobre `git ls-files` limpia en cada commit | ✅ |
 | Tests unitarios sobre el dominio | D-095 | 69 tests de dominio (xUnit) en verde; 33 tests de reglas del cliente (Vitest), justificados en el README | ✅ (ver §3, desvío 7) |
 | Supuestos en el README | — | Cada decisión marcada "Supuesto" en el registro está en README §5 (contrastado uno por uno) | ✅ |
@@ -60,7 +60,7 @@ Todas las decisiones de `docs/plan/decisions-log.md` se contrastaron con el cód
 | Decisiones | Estado | Evidencia o nota |
 |---|---|---|
 | D-001, D-002 | ✅ P | Docs en español y código en inglés; un checkpoint por paso hasta el #10 (ver §3, desvío 10) |
-| D-003 | ⏳ | Credenciales reales cargadas y webhook registrado; falta la prueba en vivo |
+| D-003 | ✅ | Credenciales reales; prueba en vivo aprobada por el humano (D-103) |
 | D-004 | ✅ | PostgreSQL 18.6 + Npgsql 10.0.3 |
 | D-005, D-006 | ✅ | .NET 10.0.14 y Angular 22.2; todo se compila en contenedores (AGENTS §3) |
 | D-007, D-008, D-009 | ✅ | 5 proyectos + tests; handlers simples; RabbitMQ.Client 7.2.2 sin MassTransit |
@@ -124,7 +124,7 @@ Todas las decisiones de `docs/plan/decisions-log.md` se contrastaron con el cód
 | 7 | Tests del frontend además de los de dominio (AGENTS §5 y requirements §6 piden tests de dominio) | A5 (R-5) | Prueban reglas del cliente: orden, precedencia de estados, upserts idempotentes | Se mantienen y se justifican en el README (D-095) |
 | 8 | El orquestador editó un archivo de A7 (README, sección Tests) | A0 | Un párrafo, con A7 ya terminado | Registrado (D-096) |
 | 9 | Un cuarto ciclo de corrección (R-4), cuando el plan escala al humano en el tercero | A0 | Defectos encontrados por QA | El humano lo aprobó explícitamente (P-027) |
-| 10 | Los Steps #11 y #12 corren sin checkpoint, con el gate G3 abierto (falta la prueba en vivo) | Humano (P-031) | Tiempo disponible | Se retoma la prueba en vivo después; cualquier hallazgo vuelve como corrección (D-100) |
+| 10 | Los Steps #11 y #12 corren sin checkpoint, con el gate G3 abierto (falta la prueba en vivo) | Humano (P-031) | Tiempo disponible | Se retoma la prueba en vivo después; cualquier hallazgo vuelve como corrección (D-100). Prueba hecha después: sin hallazgos (D-103) |
 | 11 | La evidencia de R-4 se obtuvo con RabbitMQ 4.4.0 (fijado: 4.3) | A2 | El stack descartable usó otra imagen | El arreglo no depende del contador de entregas; el stack live (4.3) se reconstruyó con R-4: sano, 1 consumidor por cola, 0 errores |
 | 12 | No hay *linter* configurado | A5 | No estaba en el plan | El control de estilo es `TreatWarningsAsErrors` + `strict` en TypeScript; no se agrega |
 
@@ -140,6 +140,8 @@ Chequeo automático sobre los 18 `.md` versionados: enlaces relativos, rutas cit
   - D-016 tenía el estado "🔁 reemplazada por D-021", pero su fila ya describe el orden vigente. Pasa a ✅ (revisada por D-021).
   - D-054 y README §5 decían que Angular 23 podía salir en días. Angular pasó a un ciclo anual y la versión 23 está prevista para junio de 2027; .NET 11 sigue en RC, con GA prevista para el 10/11.
 
-## 5. Pendiente para cerrar G3
+## 5. Cierre de G3
 
-La prueba en vivo con `docs/qa/manual-e2e-checklist.md`: un `sendMessage` exitoso, bloqueo del bot → `Failed` → desbloqueo → Reintentar, y la revisión visual de la UI. Es lo único de §3.1 que no tiene evidencia directa.
+El humano hizo la prueba en vivo con `docs/qa/manual-e2e-checklist.md` completo el 2026-11-06 (un `sendMessage` exitoso, bloqueo del bot → `Failed` → desbloqueo → Reintentar, y la revisión visual de la UI) y la aprobó sin hallazgos (P-034, D-103). G3 queda cerrado.
+
+Siguen sin verificación en vivo, porque el checklist no los cubre: el re-registro del webhook al cambiar la URL de ngrok y las respuestas 429 y 5xx de Telegram (verificadas solo leyendo el código).

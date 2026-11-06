@@ -152,3 +152,5 @@ Este informe refleja lo que QA encontró sobre `48698b6`. Los dos defectos se co
 | QA-D2 | D-094: "suscripción perdida" se decide por los `ShutdownEventArgs` del propio canal, y el `basic.cancel` del servidor tiene su propio camino (`WorkQueueConsumer`) | A2: reinicio del broker con un handler ocupado → sin "Lost the subscription" espurio, 1 consumidor por cola. Re-revisión A6 R-4: corregido |
 
 Stack live reconstruido con `7202599`: servicios sanos, 1 consumidor por cola, DLQs vacías y 0 errores en los logs. Detalle en `docs/qa/traceability.md`.
+
+Prueba en vivo del humano (2026-11-06): `docs/qa/manual-e2e-checklist.md` completo, aprobado sin hallazgos (D-103). Cubre lo que este informe marcó como no verificable sin el bot real (envío exitoso, recepción real, UI en el navegador). Siguen sin verificar en vivo el re-registro del webhook y los 429/5xx de Telegram.

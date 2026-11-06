@@ -1,7 +1,7 @@
 # Agents — roles and prompts (Step #1)
 
 > Internal process document (English). Its content feeds the Spanish deliverable `docs/ai/trabajo-con-ia.md`.
-> Every prompt actually sent to an agent is copied **verbatim** into `docs/ai/prompt-log.md` before it runs.
+> Every prompt actually sent to an agent is copied **verbatim** into `docs/ai/prompt-log.md` before it runs. The only edits are the privacy ones marked there (D-105); `<repo>` stands for the local repository path.
 
 ## Principles
 

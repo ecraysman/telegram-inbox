@@ -5,6 +5,8 @@ Used to pick the 2–3 "representative prompts" for the deliverable in `docs/ai/
 
 Tool: Claude Code (CLI), model Claude Opus 5.5.
 
+> **Privacy edits (D-105), the only changes to the verbatim text:** one line of the human's first message (P-001) is replaced with `[One line removed for privacy]`, and the local absolute path of the repository in the prompts is replaced with `<repo>`. Commit hashes cited inside the prompts point to the published history.
+
 ---
 
 ## P-001 · Human → Claude Code · 2026-11-05 · Kickoff
@@ -934,3 +936,16 @@ Prompt verbatim in [`prompts/A7-writer-step11.txt`](prompts/A7-writer-step11.txt
 Prompt verbatim in [`prompts/A6-evaluator-step12.txt`](prompts/A6-evaluator-step12.txt). A fresh agent rather than the resumed reviewer, so the evaluation comes with the repo only and no build history.
 
 **A6 R-2 result:** 84/100 (visión 12/15, arquitectura 17/20, decisiones 17/20, IA 13/15, código 17/20, funcionamiento 8/10, the last assuming the live test passes). Commands re-run by A6: 69/69 domain tests, Release build 0 warnings, 33/33 frontend tests and production build, `docker compose config -q`. 16 ranked gaps; the orchestrator verified them, closed the docs-only ones (D-102) and left the code and publishing ones to the human. One claim was checked and rejected: "RabbitMQ 4.4.0" in the QA annex is accurate (A2's throwaway stack), not a typo.
+
+## P-034 · Human → Claude Code · 2026-11-06 · Live test, decisions after step #12
+
+> 1. done, all perfect
+> 2. ignore for now, this is a POC. Note the duplicated code.
+> 3. Can you create one ? Go ahead.
+> 4. Sanitize my first message, the prompts with paths and mark that the message was edited due to privacy.
+> 5. no worries, i'll clean them myself later.
+
+Answers, in order, to: the live test, the code fix round, the public repo, the redaction of P-001 and local paths, and the dangling Docker volumes.
+
+**AI action:** G3 closed with the human's live test (D-103); the duplicated backoff noted, no code round (D-104); P-001 and the local paths redacted across the whole history before the first push, and the edits marked (D-105); public repo created and `main` pushed (D-106).
+

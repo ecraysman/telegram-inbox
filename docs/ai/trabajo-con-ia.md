@@ -15,7 +15,7 @@ Un humano decide y aprueba cada uno de los 12 pasos; la sesión principal orques
 | A6 Revisor | Revisión adversarial y evaluación final | Nada |
 | A7 Redactor | README, C4 y guía de evaluación, derivados del código | Docs |
 
-El paralelismo funcionó porque las interfaces quedaron congeladas en `docs/plan/contracts.md` antes de escribir código. Roles y prompts: [`agents.md`](agents.md); cada prompt enviado está, textual, en [`prompt-log.md`](prompt-log.md).
+El paralelismo funcionó porque las interfaces quedaron congeladas en `docs/plan/contracts.md` antes de escribir código. Roles y prompts: [`agents.md`](agents.md); cada prompt enviado está, textual, en [`prompt-log.md`](prompt-log.md), con dos ediciones de privacidad marcadas (D-105).
 
 ## 3. Prompts representativos
 1. **Arranque (humano, P-001):** *"…we need to make sure we show a great deal of responsability… #7 Review the plan, to find weak points, untracked decisions and potential issues #8 Execute the plan in parallel…"*. Fijó el proceso por pasos con un checkpoint humano en cada uno.
