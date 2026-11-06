@@ -50,7 +50,7 @@ interface ContactSummaryDto {
 | `GET /health/live` | — | 200 | — |
 | `GET /health/ready` | — | 200 when the DB and the broker are reachable | 503 |
 
-Errors use **RFC 9457 `application/problem+json`** with an extra `code` field: `validation_failed` (plus `errors: {field: [msg]}`), `contact_not_found`, `message_not_found`, `message_not_failed`.
+Errors use **RFC 9457 `application/problem+json`** with an extra `code` field: `validation_failed` (plus `errors: {field: [msg]}`), `contact_not_found`, `message_not_found`, `message_not_failed`. Responses not produced by a use case get a generic code derived from the status (`not_found`, `bad_request`, `method_not_allowed`, `unauthorized`, `conflict`, `unsupported_media_type`, `service_unavailable`, `internal_error`, `http_<n>`). The port-isolation 404s on :8081 stay empty-bodied on purpose (minimal surface on the public port).
 
 ### Telegram webhook (api:8081 only)
 `POST /telegram/webhook`, body = Telegram `Update`. Required header: `X-Telegram-Bot-Api-Secret-Token`.
@@ -142,7 +142,7 @@ ix_messages_pending       ON messages(last_queued_at) WHERE status = 'pending'
 ### .NET configuration keys (set by docker-compose from the variables above)
 | Key (env form) | Consumer |
 |---|---|
-| `ConnectionStrings__Inbox` = `Host=postgres;Port=5432;Database=…;Username=…;Password=…` | api, worker |
+| `ConnectionStrings__Inbox` = `Host=postgres;Port=5432;Database=…;Username=…;Password=…;GSS Encryption Mode=Disable` | api, worker |
 | `RabbitMq__Host` = `rabbitmq`, `RabbitMq__Port` = `5672`, `RabbitMq__User`, `RabbitMq__Password` | api, worker |
 | `Telegram__BotToken` | api (setWebhook), worker (sendMessage) |
 | `Telegram__WebhookSecret` | api |
@@ -181,6 +181,18 @@ Startup **fails fast** with a clear error if a required key is **missing or malf
 - Work messages (`inbox.incoming`, `inbox.outgoing`) are published with `mandatory: true`, persistent delivery and publisher confirms (5 s). A **basic.return** (unroutable) counts as a failure: the webhook returns 503, and for an outbound reply the row stays Pending and the sweeper retries it.
 - Events (`inbox.events`) are transient, with no confirms and not mandatory. If an event publish fails **after** the commit, the worker nacks with requeue. Re-processing is idempotent, and duplicate events are harmless.
 - Quorum `x-delivery-limit: 5`: a message is dead-lettered when its delivery count **exceeds** 5, which means up to 6 deliveries.
+- **Consumer error classes (revision 3, R-1 review, human P-015):**
+  | Class | Examples | Action |
+  |---|---|---|
+  | Poison | JSON errors, `PoisonMessageException`, `DomainException` | nack, no requeue → DLQ |
+  | Infrastructure | **transient** `DbException` (`IsTransient: true`), `TimeoutException`, broker connection errors when publishing events | **retry in process without limit**, backoff 1, 2, 4… capped at 30 s, until it succeeds (or shutdown, which leaves the message un-acked for redelivery). The DLQ is never used for infrastructure outages. |
+  | Other unexpected | anything else, including non-transient `DbException` | 3 in-process retries (1, 2, 4 s), then nack with requeue; the delivery limit then sends it to the DLQ |
+- **Outbound, no resend in process (revision 4, D-087):** once Telegram returned a final outcome, `DeliverReply` retries **only the persistence**, **without limit and for any error** (capped backoff, Critical log), and never calls `sendMessage` again within the same delivery. It is never dead-lettered. The accepted cost is that a non-recovering DB write error blocks outbound replies until it is fixed (inbound is unaffected). A duplicate is only possible if the process dies, or the broker's `consumer_timeout` (30 min) returns the message, during that window (ADR-004 at-least-once).
+- **Delivery cancellation (N-6):** the in-flight handler is cancelled only on shutdown or when the broker drops the subscription on a live connection; a connection loss handled by automatic recovery does not cancel it.
+- **Transient persistence errors (N-9):** Infrastructure translates them into the Application type `TransientPersistenceException`; Application never references ADO.NET or EF types.
+- **Re-emit on redelivery:** when `DeliverReply` finds the message already `Sent`/`Failed`, it re-emits `messageStatusChanged` before acking (mirrors the inbound duplicate path).
+- **Consumer channel lifecycle:** an un-acked delivery held longer than RabbitMQ's `consumer_timeout` (30 min) gets its channel closed by the broker. The consumer must detect the channel shutdown, stop retrying that delivery (the broker requeued it) and recreate the channel and consumer, or exit so Docker restarts it. A dead consumer must never be left behind.
+- **Sweeper:** it persists `last_queued_at` per message right after each successful publish, and stops the sweep on the first publish or save failure.
 - **There is no RabbitMQ definitions file.** The topology is declared only by one shared `RabbitMqTopology` class in Infrastructure, which both hosts call at startup.
 
 ### 7.6 Telegram error classification (`ITelegramGateway`)

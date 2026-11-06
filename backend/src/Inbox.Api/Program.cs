@@ -37,7 +37,7 @@ builder.Services.AddHostedService<WebhookRegistrationService>();
 
 builder.Services.ConfigureHttpJsonOptions(options => InboxJson.Configure(options.SerializerOptions));
 builder.Services.AddSignalR().AddJsonProtocol(options => InboxJson.Configure(options.PayloadSerializerOptions));
-builder.Services.AddProblemDetails();
+builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemCodes.EnsureCode);
 builder.Services.AddExceptionHandler<ApplicationExceptionHandler>();
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<InboxDbContext>("postgres")

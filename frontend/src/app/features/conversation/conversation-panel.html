@@ -9,7 +9,7 @@
     </div>
   </header>
 
-  <section #history class="history" aria-label="Historial de la conversación" aria-live="polite">
+  <section #history class="history" (scroll)="onHistoryScroll(history)" aria-label="Historial de la conversación" aria-live="polite">
     @if (error(); as message) {
       <p class="notice error" role="alert">{{ message }}</p>
     }
@@ -27,7 +27,7 @@
     [sending]="sending()"
     [error]="sendError()"
     (draftChange)="draftChange.emit($event)"
-    (send)="send.emit()"
+    (send)="onSend()"
   />
 } @else {
   <p class="placeholder">Seleccioná una conversación</p>

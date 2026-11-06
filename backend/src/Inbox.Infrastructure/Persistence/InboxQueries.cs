@@ -11,12 +11,8 @@ internal sealed class InboxQueries(InboxDbContext db) : IInboxQueries
 {
     public async Task<IReadOnlyList<ContactSummaryDto>> GetContactsAsync(CancellationToken cancellationToken)
     {
-        var rows = await SummaryRows(db.Contacts.AsNoTracking()).ToListAsync(cancellationToken);
-        return rows
-            .Select(ToSummary)
-            .OrderByDescending(s => s.LastMessage?.OccurredAt)
-            .ThenByDescending(s => s.LastMessage?.Seq)
-            .ToList();
+        var rows = await SummaryRows(db.Contacts.AsNoTracking(), orderByLastActivity: true).ToListAsync(cancellationToken);
+        return rows.Select(ToSummary).ToList();
     }
 
     public async Task<ContactSummaryDto?> GetContactSummaryAsync(Guid contactId, CancellationToken cancellationToken)
@@ -46,14 +42,33 @@ internal sealed class InboxQueries(InboxDbContext db) : IInboxQueries
         return message is null ? null : MessageDto.From(message);
     }
 
-    private IQueryable<SummaryRow> SummaryRows(IQueryable<Contact> contacts) =>
-        contacts.Select(c => new SummaryRow(
-            c,
-            db.Messages.Count(m => m.ContactId == c.Id && m.ReadAt == null),
-            db.Messages
+    /// <summary>
+    /// One row per contact with its unread count and last message (by OccurredAt, then Seq). With
+    /// <paramref name="orderByLastActivity"/> the database sorts by that last message, newest first; contacts without
+    /// messages go last (PostgreSQL would otherwise put NULLs first in a descending sort).
+    /// </summary>
+    private IQueryable<SummaryRow> SummaryRows(IQueryable<Contact> contacts, bool orderByLastActivity = false)
+    {
+        var rows = contacts.Select(c => new
+        {
+            Contact = c,
+            UnreadCount = db.Messages.Count(m => m.ContactId == c.Id && m.ReadAt == null),
+            LastMessage = db.Messages
                 .Where(m => m.ContactId == c.Id)
                 .OrderByDescending(m => m.OccurredAt).ThenByDescending(m => m.Seq)
-                .FirstOrDefault()));
+                .FirstOrDefault(),
+        });
+
+        if (orderByLastActivity)
+        {
+            rows = rows
+                .OrderBy(r => r.LastMessage == null)
+                .ThenByDescending(r => r.LastMessage!.OccurredAt)
+                .ThenByDescending(r => r.LastMessage!.Seq);
+        }
+
+        return rows.Select(r => new SummaryRow(r.Contact, r.UnreadCount, r.LastMessage));
+    }
 
     private static ContactSummaryDto ToSummary(SummaryRow row) => new(
         row.Contact.Id,

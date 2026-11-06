@@ -35,7 +35,9 @@ public sealed partial class DeliverReplyHandler(
 
         if (message.Status != DeliveryStatus.Pending)
         {
+            // Redelivery (or a sweeper duplicate) of a reply already settled: re-emit, so a lost event heals (D-078).
             LogAlreadyHandled(logger, message.Id, message.Status);
+            await NotifyStatusAsync(message, cancellationToken);
             return;
         }
 
@@ -56,9 +58,15 @@ public sealed partial class DeliverReplyHandler(
                 break;
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        // From here on Telegram has a final answer: only the save is retried, sendMessage is never called again
+        // within this delivery (D-077). Anything that fails after the save finds the reply settled on re-run.
+        await PersistenceRetry.RunAsync(unitOfWork.SaveChangesAsync, clock, logger, message.Id, cancellationToken);
         LogOutcome(logger, message.Id, message.Status);
+        await NotifyStatusAsync(message, cancellationToken);
+    }
 
+    private async Task NotifyStatusAsync(Message message, CancellationToken cancellationToken)
+    {
         var payload = await payloads.ForMessageAsync(message.Id, message.ContactId, cancellationToken);
         await notifier.MessageStatusChangedAsync(payload, cancellationToken);
     }
@@ -67,6 +75,7 @@ public sealed partial class DeliverReplyHandler(
     {
         for (var attempt = 0; ; attempt++)
         {
+            LogSending(logger, message.Id, attempt + 1);
             var result = await telegram.SendMessageAsync(chatId, message.Text.Value, cancellationToken);
             if (result is not SendMessageResult.Transient transient || attempt == MaxRetries)
             {
@@ -81,7 +90,10 @@ public sealed partial class DeliverReplyHandler(
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "Reply {MessageId} is already {Status}; nothing to send")]
+    [LoggerMessage(Level = LogLevel.Debug, Message = "Calling sendMessage for reply {MessageId} (attempt {Attempt})")]
+    private static partial void LogSending(ILogger logger, Guid messageId, int attempt);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Reply {MessageId} is already {Status}; not sending again, re-emitting its status")]
     private static partial void LogAlreadyHandled(ILogger logger, Guid messageId, DeliveryStatus status);
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Transient Telegram error for reply {MessageId} (retry {Retry}) in {DelaySeconds}s: {Description}")]

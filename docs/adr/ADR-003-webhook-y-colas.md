@@ -16,7 +16,7 @@ Telegram entrega cada mensaje con un `POST` al webhook y **reintenta** si no rec
 |---|---|---|
 | Procesos | Un único proceso: la api consume su propia cola. Es más simple, pero el desacople queda solo en el código. | **api (recepción) + worker (procesamiento) separados.** La recepción depende solo del broker y el procesamiento solo de la base. Cada uno escala y falla por separado. |
 | Respuesta del webhook | Siempre 200. Es simple, pero si el broker cae el mensaje se pierde. | **200 solo tras el *publisher confirm* del broker y 503 si falla**, para que Telegram reintente (según su documentación, guarda los updates no entregados hasta 24 h). |
-| Reintentos | Colas de reintento con TTL + DLX y conteo de `x-death`: backoff real, pero más piezas. | **Cola *quorum* con `x-delivery-limit` + reintento corto en proceso**: protección nativa contra mensajes venenosos con poco código. |
+| Reintentos | Colas de reintento con TTL + DLX y conteo de `x-death`: backoff real, pero más piezas. | **Reintento en proceso + cola *quorum* con `x-delivery-limit`**: la DLQ queda solo para mensajes venenosos. |
 | Contrato en cola | El `Update` crudo de Telegram: acopla el worker al esquema de Telegram. | **`IncomingTextMessage v1` propio** (capa anticorrupción). |
 | Librería | MassTransit: retries gratis, pero v9 es comercial y oculta la topología. | **RabbitMQ.Client 7**: la topología queda explícita en el código. |
 
@@ -31,8 +31,9 @@ Telegram entrega cada mensaje con un `POST` al webhook y **reintenta** si no rec
 6. Recién después del *commit* publica `messageReceived` en `inbox.events` y hace **ack**. Ante un duplicado, también hace ack y vuelve a notificar.
 
 **Errores en el worker:**
-- Los permanentes (deserialización, validación) se rechazan sin reencolar y van a la DLQ.
-- Los transitorios (base caída) se reintentan 3 veces en proceso con backoff (1/2/4 s) y luego se reencolan. Cuando la cantidad de entregas supera `x-delivery-limit` (5), van a la DLQ.
+- Permanentes (deserialización, validación): se rechazan sin reencolar y van a la DLQ.
+- De infraestructura (base o broker caídos, timeouts): se reintentan en proceso **sin límite**, con backoff de hasta 30 s, hasta que el servicio vuelve. Así una caída larga de la base no manda a la DLQ mensajes que Telegram ya nos entregó. Se procesa de a uno, así que el orden se mantiene.
+- Otros errores inesperados: 3 reintentos y luego se reencolan. Cuando las entregas superan `x-delivery-limit` (5), van a la DLQ.
 
 **Topología** (la declaran de forma idempotente la api y el worker al iniciar):
 ```
@@ -47,5 +48,5 @@ inbox.events   (fanout) ─► una cola exclusiva auto-delete por instancia de a
 ## Consecuencias
 
 - **Ganamos:** durabilidad de punta a punta (Telegram → confirm → commit → ack), idempotencia en dos capas, aislamiento de mensajes venenosos, una DLQ por flujo y una API privada.
-- **Resignamos:** simplicidad (un contenedor más y clasificación de errores). El reintento en proceso bloquea el consumidor unos segundos, aceptable a este volumen.
+- **Resignamos:** simplicidad (un contenedor más y clasificación de errores). Durante una caída de la base, el consumidor queda bloqueado reintentando: los mensajes esperan en la cola, sin perderse.
 - **Riesgos:** con reintentos, el orden de procesamiento no está garantizado, así que el historial se ordena por fecha + secuencia. Un 503 sostenido acumula pendientes en Telegram, que se recuperan al volver el broker. El plan gratuito de ngrok admite una sola sesión y la URL puede cambiar al reiniciarlo (lo mitiga el re-registro).

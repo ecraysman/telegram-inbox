@@ -1,0 +1,6 @@
+Fix round R-1 for frontend: one finding from the code review. Same rules as before (AGENTS.md, own paths only, no git state changes, containers as your user).
+
+MI-11: conversation-panel.ts (around lines 40-46) forces scrollTop = scrollHeight on every messages() change (status updates, incoming events), which yanks an operator who is reading older history back to the bottom. Change it so that it auto-scrolls only when (a) the conversation was just opened/switched, (b) the user is already near the bottom (e.g. within 80px), or (c) the operator just sent a message. Add a unit test if practical.
+Do NOT change the status-precedence rule for retry (the human decided to keep §7.10 strict, D-079).
+
+Verify: ng build (0 warnings) and ng test, in node:24-alpine as your user. Report in the usual 5-section format.

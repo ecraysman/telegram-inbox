@@ -1,0 +1,12 @@
+Re-review R-1 (Wave 2, step 3 of the plan): verify the fixes for YOUR findings, limited to the changed files. Same read-only rules as before (no edits, no state-changing git, no container restarts, no data-creating requests, never `docker compose config` without -q).
+
+Human decisions since your review (read docs/plan/decisions-log.md D-076..D-082 and contracts.md §7.5 revision 3):
+- MA-3 → unlimited in-process retry for infrastructure errors (fixed in code + ADR-003).
+- MI-8 declined (retry UI stays strict, D-079). MI-7 declined (documented as a Supuesto, D-080).
+- MI-4/MI-5/MI-6/MI-10 are documentation items (ADR-002/004 updated; README pending in Step #9).
+
+Changed files: run `git status --porcelain` and `git diff` (vs HEAD 3254aad) to see them — backend/src (QueueConsumer, ConsumerErrorClassifier, DeliverReply, PersistenceRetry, RequeueStalePendingReplies, OutboundPublishing, InboxQueries, ProblemCodes, Program.cs, two csproj), frontend conversation-panel.*, docker-compose.yml, docs/adr/*, docs/plan/contracts.md.
+
+For each of MA-1, MA-2, MA-3, MI-1, MI-2, MI-3, MI-9, MI-11, MI-12: state FIXED / NOT FIXED / PARTIAL with file:line evidence.
+Then look for NEW defects introduced by these changes only (e.g. infinite-retry loops that can never exit on shutdown, exception classification that treats a poison error as infrastructure and blocks the queue forever, sweeper behaviour, scroll logic). The stack has been rebuilt and is running with these changes; you may use read-only checks (logs, ps, GETs).
+Rank any new finding blocker/major/minor. Report in the usual 5-section format.

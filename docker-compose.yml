@@ -9,7 +9,9 @@
 
 name: inbox
 
-x-db-connection: &db-connection "Host=postgres;Port=5432;Database=${POSTGRES_DB:?set POSTGRES_DB in .env};Username=${POSTGRES_USER:?set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}"
+# GSS Encryption Mode=Disable: Npgsql otherwise probes GSS encryption and logs "Cannot load library
+# libgssapi_krb5.so.2" in the worker's runtime image (Kerberos is not used; plain password auth on the internal network).
+x-db-connection: &db-connection "Host=postgres;Port=5432;Database=${POSTGRES_DB:?set POSTGRES_DB in .env};Username=${POSTGRES_USER:?set POSTGRES_USER in .env};Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env};GSS Encryption Mode=Disable"
 
 services:
   postgres:

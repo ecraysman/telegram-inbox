@@ -1,0 +1,14 @@
+Fix round R-1 for backend: the code review found issues in your code. Read docs/plan/contracts.md §7.5 again (revision 3, changed by the human) and docs/plan/decisions-log.md D-076..D-081 first. Same rules as before (AGENTS.md, own paths only, no git state changes, containers as your user). The full stack is RUNNING via docker compose with the real .env: do not stop/recreate it and do not run your own api/worker on the same ports; build and test in containers only. The orchestrator rebuilds and restarts the stack after your report.
+
+Fix (all verified by the orchestrator in your code):
+1. MA-3 (D-076): QueueConsumer error classes per §7.5. Infrastructure errors (DbException/NpgsqlException, TimeoutException, broker connection errors on event publish) are retried in process WITHOUT LIMIT, backoff 1,2,4.. capped at 30 s, until success or shutdown (on shutdown leave it un-acked). Poison → DLQ as today. Other unexpected → current bounded behaviour.
+2. MA-1 (D-077): DeliverReply must never call sendMessage again within the same delivery once it has a final outcome (Delivered/Rejected/exhausted Transient). Retry only the persistence (unlimited, capped backoff) inside the handler. The consumer-level retry must not cause a resend: make sure an infrastructure exception after the send can't make QueueConsumer re-run the send.
+   Sweeper (RequeueStalePendingReplies): save last_queued_at per message right after each successful publish; stop the sweep on the first publish or save failure.
+3. MA-2 (D-078): when DeliverReply finds the message already Sent/Failed, re-emit messageStatusChanged (build the payload as usual) before returning.
+4. MI-1: sort GET /api/contacts in SQL (ORDER BY last occurredAt desc, then seq desc), not in memory.
+5. MI-2: <Using Remove="System.Net.Http" /> in Inbox.Domain and Inbox.Application csproj.
+6. MI-9: every ProblemDetails carries `code`, including the route-constraint 404 (e.g. "not_found") and other status-code-page errors.
+7. MI-12: move OutboundPublishing to its own file. Leave Contact.MarkConversationReadUpTo as is unless the change is trivial and well-tested; justify either way.
+Do NOT implement MI-7 (ordering truncation) or anything for MI-8 — the human declined them.
+
+Add/adjust domain unit tests where domain code changes. Verify: dotnet build (0 warnings), dotnet test. For MA-1/MA-3 explain in the report how you verified the behaviour (e.g. a targeted run against throwaway postgres/rabbitmq containers on a separate docker network and different host ports, then removed). Report in the usual 5-section format.

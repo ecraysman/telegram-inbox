@@ -21,18 +21,20 @@ public sealed partial class RequeueStalePendingRepliesHandler(
         var requeued = 0;
         foreach (var message in stale)
         {
+            // Stop at the first failure: the broker or the database is down, and the next sweep starts over.
             if (!await OutboundPublishing.TryPublishAsync(publisher, message.Id, logger, cancellationToken))
             {
                 break;
             }
 
+            // Saved per message right after its publish, so a later failure never re-publishes it on the next sweep (D-077).
             message.RecordRequeued(now);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             requeued++;
         }
 
         if (requeued > 0)
         {
-            await unitOfWork.SaveChangesAsync(cancellationToken);
             LogRequeued(logger, requeued);
         }
 

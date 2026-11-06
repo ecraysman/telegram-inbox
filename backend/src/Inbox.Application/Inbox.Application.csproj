@@ -6,4 +6,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Inbox.Domain\Inbox.Domain.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Keep HttpClient out of the inner layers (AGENTS.md §5): no implicit System.Net.Http using. -->
+    <Using Remove="System.Net.Http" />
+  </ItemGroup>
 </Project>

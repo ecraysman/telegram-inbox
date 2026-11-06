@@ -1,0 +1,4 @@
+Fix round R-1 for platform: one finding from the code review. Same rules as before (AGENTS.md, own paths only, never `docker compose config` without -q).
+
+MI-3: the worker logs "Cannot load library libgssapi_krb5.so.2" because Npgsql probes GSS encryption and the runtime image lacks the library (the api image has it only because curl pulls it in). Append `;GSS Encryption Mode=Disable` to the shared connection string (x-db-connection in docker-compose.yml). Do not install extra packages.
+Also add a short comment explaining it. Verify with docker compose config -q. Do NOT restart the running stack — the orchestrator will. Report in the usual 5-section format.

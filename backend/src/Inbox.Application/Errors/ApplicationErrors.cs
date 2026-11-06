@@ -23,3 +23,9 @@ public sealed class ValidationFailedException(string field, string error)
 
 /// <summary>A queue message that can never succeed (unknown id, invalid data). The consumer dead-letters it.</summary>
 public sealed class PoisonMessageException(string message) : Exception(message);
+
+/// <summary>
+/// A persistence call failed for a reason that is expected to heal (connection lost, timeout, serialization failure).
+/// Raised by the persistence adapter so the inner layers can tell outages apart without knowing ADO.NET or EF Core.
+/// </summary>
+public sealed class TransientPersistenceException(string message, Exception innerException) : Exception(message, innerException);
