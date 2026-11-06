@@ -926,3 +926,11 @@ Check: (a) IsChannelLevelClose: are the chosen reply codes and the Peer-initiato
 Prompt verbatim in [`prompts/A7-writer-step11.txt`](prompts/A7-writer-step11.txt). The handout content was chosen by the orchestrator under D-100: an evaluator's guide (what it is, 5-minute run, a tour by §7 criterion with paths, decisions beyond scope, known limits, documentation map).
 
 **A7 W-3 result:** `docs/handout.md` (~1,090 words, 21 links all present). The orchestrator reviewed it and fixed four points: a stale "being written in parallel" note, "one major defect" → the two defects QA found, the webhook re-registration claimed as working → "designed to" (not verified live), and the missing bonus-answers row. Orchestrator (O-6, O-7): `docs/ai/trabajo-con-ia.md`, `docs/preguntas-bonus.md`, README links and a QA-report addendum (D-101). Reference check: 22 docs, 0 dangling.
+
+---
+
+## P-033 · Orchestrator → A6 (Agent, Opus, read-only) · Step #12 evaluator mode (R-2)
+
+Prompt verbatim in [`prompts/A6-evaluator-step12.txt`](prompts/A6-evaluator-step12.txt). A fresh agent rather than the resumed reviewer, so the evaluation comes with the repo only and no build history.
+
+**A6 R-2 result:** 84/100 (visión 12/15, arquitectura 17/20, decisiones 17/20, IA 13/15, código 17/20, funcionamiento 8/10, the last assuming the live test passes). Commands re-run by A6: 69/69 domain tests, Release build 0 warnings, 33/33 frontend tests and production build, `docker compose config -q`. 16 ranked gaps; the orchestrator verified them, closed the docs-only ones (D-102) and left the code and publishing ones to the human. One claim was checked and rejected: "RabbitMQ 4.4.0" in the QA annex is accurate (A2's throwaway stack), not a typo.

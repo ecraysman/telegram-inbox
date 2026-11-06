@@ -1,4 +1,4 @@
-# Handout para la evaluación
+# Guía para la evaluación
 
 Es el primer documento a leer, antes del código. No repite el [README](../README.md): apunta a él y a la evidencia.
 
@@ -73,12 +73,13 @@ Guía paso a paso (incluye la verificación de la URL pública): [docs/qa/manual
 - **Envío saliente serial** (prefetch 1, un consumidor): durante una caída de Telegram, cada respuesta espera los reintentos de la anterior (~7 s en 5xx o red; hasta ~30 s con 429). D-035.
 - **Entrega al menos una vez a Telegram:** una caída entre el envío y el guardado puede duplicar una respuesta; Telegram no ofrece idempotencia. D-030, ADR-004.
 - **Un solo operador**, lectura global, api en una réplica. D-027.
-- **Prueba con Telegram real pendiente al momento de escribir esto (gate G3 abierto, D-100):** el envío exitoso (tilde), la recepción real y la UI en navegador no están verificados por QA; los cubre el checklist manual.
+- **Prueba con Telegram real pendiente al momento de escribir esto (D-100):** el envío exitoso (tilde), la recepción real y la UI en el navegador no los verificó QA; los cubre el checklist manual.
 - **Re-registro del webhook al cambiar la URL de ngrok:** no verificado en vivo (solo el registro inicial).
 - **429 y 5xx de Telegram:** verificados únicamente leyendo el código (`TelegramGateway`, `DeliverReply`); no se pudieron provocar.
-- **Defecto QA-D1 (RabbitMQ 4.3 no cuenta las reentregas por `nack` con requeue):** corregido en D-093 (tras 3 reintentos en proceso, `nack` sin requeue hacia la DLQ). La corrección se verificó en un stack descartable (el mensaje llega a la DLQ a los ~7 s, una vez) y la re-revisó A6; ver el anexo del [informe de QA](qa/verification-report.md).
+- **Defecto QA-D1 (RabbitMQ 4.3 no cuenta las reentregas por `nack` con requeue):** corregido en D-093 (tras 3 reintentos en proceso, `nack` sin requeue hacia la DLQ). La corrección se verificó en un stack descartable (el mensaje llega a la DLQ a los ~7 s, una vez) y pasó una nueva revisión de código; ver el anexo del [informe de QA](qa/verification-report.md).
 - **Tests del frontend:** el enunciado pide tests unitarios del dominio; los 33 del cliente son unitarios sobre reglas de estado y se justifican en D-095.
 - **Sin linter configurado:** el único control estático es `TreatWarningsAsErrors`.
+- **El consumidor de RabbitMQ es la pieza más compleja** (`backend/src/Inbox.Infrastructure/Messaging/QueueConsumer.cs`): reintentos por clase de error, re-suscripción ante `consumer_timeout` y una generación por canal para no confirmar entregas de un canal ya cerrado. Existe para no perder ni duplicar mensajes ante caídas y reconexiones (D-083, D-088, D-093, D-094). En producción convendría evaluar una librería madura que lo resuelva, o separar la política de reintentos en su propia clase.
 
 ## 6. Mapa de la documentación
 

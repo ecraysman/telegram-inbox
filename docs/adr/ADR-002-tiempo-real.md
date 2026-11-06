@@ -6,7 +6,7 @@
 
 El operador tiene que ver en el momento los mensajes nuevos, los cambios de no leídos y el estado de entrega de sus respuestas (pendiente, enviada o fallida). El tráfico es casi todo **servidor → cliente**: las acciones del operador (responder, marcar leído, reintentar) ya viajan por la API HTTP.
 
-Hay dos procesos de backend. El **worker** genera la mayoría de los eventos (mensaje recibido, cambio de estado de entrega), pero no tiene conexión con los navegadores. La **api** sí la tiene. Hace falta reconexión automática, porque en una demo con Docker los reinicios son comunes. No debe perderse nada durante un corte, y el stack tiene que ser oficial en .NET 10 y Angular 22.
+El **worker** genera la mayoría de los eventos, pero solo la **api** tiene conexión con los navegadores. Hace falta reconexión automática (en Docker los reinicios son comunes), no perder nada durante un corte y usar tecnología oficial en .NET 10 y Angular 22.
 
 ## Alternativas consideradas
 
@@ -19,24 +19,14 @@ Hay dos procesos de backend. El **worker** genera la mayoría de los eventos (me
 
 ## Decisión
 
-Se usa **SignalR**, con un hub `/hubs/inbox` **solo servidor → cliente** y cuatro eventos:
-- `messageReceived`
-- `messageQueued`
-- `messageStatusChanged`
-- `conversationRead`
+Se usa **SignalR**, con un hub `/hubs/inbox` **solo servidor → cliente** y cuatro eventos (`messageReceived`, `messageQueued`, `messageStatusChanged`, `conversationRead`). Cada uno lleva el mensaje o contacto completo, no un delta.
 
-Cada evento lleva el mensaje o contacto completo, no un delta.
+Para llegar a los navegadores sin conocer SignalR, el worker publica en el exchange *fanout* `inbox.events`. Cada instancia de la api lo consume con una cola exclusiva y lo reenvía al hub. El puerto `IInboxNotifier` tiene dos adaptadores: SignalR en la api y RabbitMQ en el worker.
 
-Para que el worker llegue a los navegadores sin conocer SignalR, publica eventos en el exchange *fanout* `inbox.events` de RabbitMQ. Cada instancia de la api los consume con una cola exclusiva y los reenvía al hub. El puerto `IInboxNotifier` tiene dos adaptadores: SignalR en la api y RabbitMQ en el worker. La api recibe por el mismo exchange los eventos que genera el worker.
-
-**Reglas del cliente:**
-- Hace *upsert* por id, así que un evento duplicado no tiene efecto.
-- En `onreconnected` vuelve a pedir el listado y la conversación abierta, lo que cubre cualquier hueco durante el corte.
-
-SSE queda documentado como segunda opción.
+**Reglas del cliente:** *upsert* por id, así que un duplicado no tiene efecto; en `onreconnected` vuelve a pedir el listado y la conversación abierta, lo que cubre cualquier hueco. SSE queda como segunda opción.
 
 ## Consecuencias
 
-- **Ganamos:** reconexión y *fallback* sin código propio. El hub no conoce RabbitMQ, y el worker no conoce SignalR (Clean Architecture: puertos y adaptadores). Los eventos del worker llegan a todas las réplicas de la api por `inbox.events`. Los que origina la propia api (encolado, lectura) se emiten localmente, así que escalar a varias réplicas requeriría enrutarlos también por `inbox.events` o sumar un *backplane*. Hoy se asume una sola réplica (ver Supuestos).
+- **Ganamos:** reconexión y *fallback* sin código propio; el hub no conoce RabbitMQ y el worker no conoce SignalR (puertos y adaptadores). Los eventos que origina la api (encolado, lectura) se emiten localmente: con varias réplicas habría que enrutarlos también por `inbox.events` o sumar un *backplane*. Hoy se asume una sola réplica (Supuestos).
 - **Resignamos:** un protocolo estándar abierto (SignalR solo se consume bien con su cliente) y un salto extra (worker → RabbitMQ → api → navegador), de pocos milisegundos.
-- **Riesgos:** los eventos son **transitorios**: si la api está caída, o si pierde momentáneamente su conexión con RabbitMQ, se pierden. Es aceptable, porque la fuente de verdad es la base: el cliente resincroniza al reconectar o al recargar. El proxy nginx debe configurarse para WebSocket (`Upgrade`/`Connection`, timeouts largos). Sin autenticación (fuera de alcance), cualquiera que alcance el hub ve los eventos. Por eso el hub **no** se expone por ngrok (ADR-003).
+- **Riesgos:** los eventos son **transitorios**: si la api está caída o pierde un momento su conexión con RabbitMQ, se pierden. Es aceptable porque la fuente de verdad es la base y el cliente resincroniza al reconectar o recargar. nginx debe configurarse para WebSocket (`Upgrade`/`Connection`, timeouts largos). Sin autenticación (fuera de alcance), cualquiera que alcance el hub ve los eventos; por eso **no** se expone por ngrok (ADR-003).

@@ -4,7 +4,7 @@
 
 ## Contexto
 
-PostgreSQL es la fuente de verdad (ADR-001). Se evaluó si hace falta un respaldo en disco ("dump" de mensajes) para cuando la base falla. Primero se analizó qué pasa hoy en cada flujo:
+PostgreSQL es la fuente de verdad (ADR-001). Se evaluó si hace falta un respaldo en disco para cuando la base falla, empezando por qué pasa hoy en cada flujo:
 
 | Flujo | Con la base caída | ¿Se pierde algo? |
 |---|---|---|
@@ -20,14 +20,13 @@ El único dato que existe solo en memoria es el último caso: "Telegram aceptó 
 | Opción | Ventajas | Desventajas |
 |---|---|---|
 | **No agregar respaldo; documentar** (elegida) | No suma estado ni complejidad. RabbitMQ ya cubre los entrantes y ADR-004 evita duplicados | Las salientes se bloquean ante una falla de escritura que no se recupera |
-| Journal local en el worker, **JSON Lines** | Desbloquea las salientes y evita duplicados aun si el worker se cae. Se escribe un registro a la vez (*append*), es legible y un renglón cortado se detecta fácil. No suma dependencias | Unas 150 líneas más tests y un volumen nuevo. Casos nuevos: journal corrupto, reconciliación, disco lleno. Supone un solo worker |
-| Journal en **CSV** | Simple | El texto de los mensajes tiene comas, comillas y saltos de línea, así que el *escaping* es frágil, y no tiene tipos |
-| Journal en **Parquet** | Compacto, ideal para análisis | Formato columnar por lotes: no permite agregar registros de a uno de forma segura y requiere una librería. No sirve como log ante caídas |
+| Journal local en el worker, **JSON Lines** | Desbloquea las salientes y evita duplicados aun si el worker se cae. *Append* de a un registro, legible, un renglón cortado se detecta fácil, sin dependencias | ~150 líneas más tests y un volumen. Casos nuevos: journal corrupto, reconciliación, disco lleno. Supone un solo worker |
+| Journal en **CSV** o **Parquet** | CSV es simple; Parquet, compacto para análisis | CSV: el texto tiene comas, comillas y saltos de línea (*escaping* frágil, sin tipos). Parquet: columnar por lotes, no admite *append* seguro de a uno y requiere una librería |
 | Cola "resultados de entrega" en RabbitMQ | Reusa un almacenamiento durable existente | El barredor no puede consultar la cola antes de reenviar, así que vuelve el riesgo de duplicado |
 
 ## Decisión
 
-**No se implementa un respaldo en disco en esta prueba de concepto.** La durabilidad de los entrantes ya la da RabbitMQ. La brecha restante es angosta: solo se da si la base acepta lecturas pero rechaza escrituras justo después de un envío exitoso y, además, el worker se cae en ese lapso. Si hiciera falta, la opción es un **journal JSON Lines** en un volumen del worker: se escribe y fuerza a disco antes de confirmar, el envío y el barredor lo consultan antes de enviar, y un reconciliador lo aplica al volver la base.
+**No se implementa un respaldo en disco en esta prueba de concepto.** RabbitMQ ya da la durabilidad de los entrantes; la brecha restante solo aparece si la base rechaza escrituras justo después de un envío exitoso **y** el worker se cae en ese lapso. Si hiciera falta: un **journal JSON Lines** en un volumen del worker, forzado a disco antes de confirmar, consultado antes de cada envío y aplicado por un reconciliador al volver la base.
 
 ## Consecuencias
 

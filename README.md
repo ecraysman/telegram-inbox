@@ -4,7 +4,7 @@ Prueba técnica encodelabs: una bandeja web donde un operador recibe, visualiza 
 
 **Resumen del desafío.** La bandeja debe: (1) recibir en tiempo real los mensajes de texto enviados al bot; (2) listar los contactos con su nombre o username, la cantidad de mensajes no leídos y la vista previa del último mensaje; (3) abrir una conversación y mostrar su historial; (4) marcar los mensajes como leídos al abrirla; y (5) permitir responder al contacto, de modo que la respuesta llegue al usuario en Telegram. Requisitos técnicos: backend .NET con Clean Architecture, frontend Angular, base de datos a elección, RabbitMQ para los mensajes entrantes, comunicación en tiempo real a elección, bot propio creado con BotFather, webhook registrado automáticamente con la URL pública de ngrok, y todo levantado con Docker Compose después de completar el `.env`. Quedan fuera de alcance: autenticación, mensajes que no sean de texto, diseño responsive y paginación del historial.
 
-**Para evaluar:** el [handout](docs/handout.md) es la guía de lectura (recorrido por criterio, decisiones y límites conocidos) y [docs/qa/traceability.md](docs/qa/traceability.md) mapea cada requisito a su código y evidencia.
+**Para evaluar:** la [guía para la evaluación](docs/handout.md) propone un recorrido por criterio, con las decisiones y los límites conocidos, y [docs/qa/traceability.md](docs/qa/traceability.md) mapea cada requisito a su código y evidencia. Los entregables (README, ADR, C4, IA, bonus, QA) están en español; los documentos de trabajo internos (`docs/plan`, `docs/ai/prompts`, comentarios del código) están en inglés (D-001).
 
 ## 1. Requisitos previos
 
@@ -49,7 +49,7 @@ Todos los puertos del host están atados a `127.0.0.1`. El inspector de ngrok mu
 
 ## 4. Cómo probarla de punta a punta
 
-La guía paso a paso está en [docs/qa/manual-e2e-checklist.md](docs/qa/manual-e2e-checklist.md) (la escribe QA en paralelo). Versión corta:
+La guía paso a paso está en [docs/qa/manual-e2e-checklist.md](docs/qa/manual-e2e-checklist.md). Versión corta:
 
 1. Con la solución levantada, abrí http://localhost:4200. Debe verse la bandeja vacía.
 2. Desde tu cuenta de Telegram, abrí el bot y enviale un texto. Debe aparecer el contacto en la UI en tiempo real, con el contador de no leídos en 1 y la vista previa.
@@ -65,7 +65,7 @@ curl -s -o /dev/null -w "%{http_code}\n" https://TU_DOMINIO/hubs/inbox          
 curl -s -o /dev/null -w "%{http_code}\n" -X POST https://TU_DOMINIO/telegram/webhook -d '{}'   # esperado: 401 (sin el secreto)
 ```
 
-Puede que ngrok devuelva una página intermedia en los navegadores; con `curl` no. Estos códigos son los esperados según el diseño (D-020, D-044); no los verifiqué en esta redacción del README, QA los valida en el checklist.
+Puede que ngrok devuelva una página intermedia en los navegadores; con `curl` no. QA los verificó sobre la URL pública real (D-020, D-044; [informe §5](docs/qa/verification-report.md)).
 
 ## 5. Supuestos
 
@@ -77,7 +77,7 @@ Decisiones de alcance tomadas ante lo que el enunciado no define (el identificad
 - La UI se sirve en `localhost:4200`, no a través de ngrok; ngrok expone únicamente el webhook (D-028, D-020).
 - Si se cambia el token del bot sobre una base existente, hay que recrear los datos con `docker compose down -v`, porque el `update_id` de Telegram es por bot (D-052).
 - Un mensaje demorado por reintentos de Telegram conserva su fecha original y se ordena en el pasado (D-053).
-- «Última versión estable» se interpreta como .NET 10 (LTS) y Angular 22. Al 2026-11-06, .NET 11 sigue en *release candidate* (su GA está prevista para el 10/11) y Angular 23 está previsto para junio de 2027 (D-054).
+- «Última versión estable» se interpreta a la fecha de entrega (2026-11-06): .NET 10 (LTS) y Angular 22. .NET 11 estaba en *release candidate* (su GA es posterior a la entrega) y Angular 23 está previsto para junio de 2027 (D-054).
 - Un empate dentro del mismo segundo entre una respuesta (precisión de milisegundos) y un mensaje entrante (segundos enteros) puede mostrarse en cualquier orden; el desfase de reloj del host tiene el mismo efecto (D-080).
 - Ambas variables de Telegram deben tener valor; un token con formato válido pero falso permite usar la bandeja sin bot (D-081).
 - El tope de `retry_after` de Telegram es de 10 s y todo 4xx distinto de 429 se considera permanente (D-051).

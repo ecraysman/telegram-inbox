@@ -2,13 +2,7 @@
 
 ## 1. ¿Para qué usarías un sistema de caché en una bandeja conversacional?
 
-Para que las lecturas frecuentes no crezcan con el historial, sin que la caché pase a ser la fuente de verdad. Hoy el listado de contactos calcula en cada consulta los no leídos y el último mensaje (D-022): es consistente y alcanza para un POC, pero su costo crece con la cantidad de mensajes. El primer candidato es el **resumen por contacto** (no leídos, última vista previa) en Redis, con patrón *cache-aside*. La invalidación vendría de los mismos eventos que ya emite el worker por `inbox.events` (`messageReceived`, `conversationRead`, `messageStatusChanged`), con un TTL corto como red de seguridad. Otros usos naturales:
-- la deduplicación de `update_id` en el borde, antes de publicar (hoy la garantiza el índice único de la base);
-- el control del límite de envío de Telegram (aproximadamente 1 mensaje por segundo por chat), compartido entre réplicas del worker;
-- datos de perfil y avatares;
-- el *backplane* de SignalR, cuando haya más de una réplica de la api.
-
-Lo que no cachearía es el estado de entrega de un mensaje: ese estado vive en la base y viaja por eventos. Disparador para introducirla: que `GET /api/contacts` deje de responder rápido con el volumen real.
+Para que las lecturas frecuentes no crezcan con el historial, sin que la caché pase a ser la fuente de verdad. Hoy el listado de contactos calcula en cada consulta los no leídos y el último mensaje (D-022): es consistente y alcanza para un POC, pero su costo crece con la cantidad de mensajes. El primer candidato es el **resumen por contacto** (no leídos, última vista previa) en Redis, con patrón *cache-aside*, invalidado por los mismos eventos que ya emite el worker por `inbox.events` y con un TTL corto como red de seguridad. Otros usos naturales son la deduplicación de `update_id` en el borde (hoy la garantiza el índice único de la base), el control compartido del límite de envío de Telegram (aproximadamente 1 mensaje por segundo por chat) cuando haya varias réplicas del worker, los datos de perfil y avatares, y el *backplane* de SignalR con más de una réplica de la api. No cachearía el estado de entrega de un mensaje, que vive en la base y viaja por eventos. La introduciría cuando `GET /api/contacts` deje de responder rápido con el volumen real.
 
 ## 2. ¿Cómo gestionarías el tráfico de archivos multimedia?
 
